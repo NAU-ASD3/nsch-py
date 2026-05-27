@@ -62,5 +62,6 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  # API reference, design decisions, and operational docs will be added
-  # as the package gains functions in subsequent PRs.
+  - Design decisions: design-decisions.md
+  # API reference and operational docs will be added as the package
+  # gains functions in subsequent PRs.

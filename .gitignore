@@ -1,7 +1,4 @@
 # --- Project-specific ---------------------------------------------------
-# CLAUDE.md is a per-developer context file that lives at the repo root
-# but is never committed. See the personal development notes for details.
-CLAUDE.md
 
 # Real NSCH data files — too large to commit, and may contain
 # pre-release public-use files under embargo.
@@ -79,3 +76,4 @@ site/
 
 # --- Logs --------------------------------------------------------------
 *.log
+nsch-python-migration-plan.md
