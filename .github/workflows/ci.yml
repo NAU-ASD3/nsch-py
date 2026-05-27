@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel any in-progress run for the same branch/PR when a new commit lands.
+# Saves CI minutes on rapid push cycles during development.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal token scope by default; jobs that need more permissions
+# (docs deploy, dependency review) request them explicitly.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Lint + format check + type check.
+  # Runs on a single Python version for speed; full matrix is in `test`.
+  # ---------------------------------------------------------------------
+  lint:
+    name: Lint, format, type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: mypy strict
+        run: uv run mypy src/
+
+  # ---------------------------------------------------------------------
+  # Test matrix across supported Python versions.
+  # Mirrors the R repo's oldrel/release/devel discipline.
+  # Coverage is gathered from the newest Python row only (avoids
+  # duplicate reports) but tests must pass on all rows.
+  # ---------------------------------------------------------------------
+  test:
+    name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # Don't cancel other matrix jobs on first failure.
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          # Sanity-check macOS on the newest Python only — catches
+          # platform-specific bugs (path separators, file encoding) without
+          # tripling our CI runtime.
+          - os: macos-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --group dev --python ${{ matrix.python-version }}
+
+      - name: Run tests
+        run: |
+          uv run --python ${{ matrix.python-version }} \
+            pytest -n auto \
+              --cov=src/nsch \
+              --cov-report=xml \
+              --cov-report=term-missing
+
+      # Upload coverage to Codecov from the newest Linux row only.
+      # The coverage threshold (85%) is enforced inside pytest via
+      # `[tool.coverage.report] fail_under = 85` — Codecov is for
+      # visualization, not the gate.
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---------------------------------------------------------------------
+  # Verify the package builds cleanly. Catches packaging bugs
+  # (missing data files, invalid metadata, src/ layout misconfigurations)
+  # that test runs alone won't catch.
+  # ---------------------------------------------------------------------
+  build:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Build
+        run: uv build
+
+      - name: Check distribution metadata
+        run: |
+          uv tool run --from build pyproject-build --installer uv 2>/dev/null || true
+          ls -la dist/
+          # Sanity check: both wheel and sdist must be produced.
+          test -n "$(ls dist/*.whl 2>/dev/null)"
+          test -n "$(ls dist/*.tar.gz 2>/dev/null)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------
+  # Verify the documentation site builds without errors.
+  # A docs-only PR can otherwise land broken mkdocs config that breaks
+  # the published site on the next merge.
+  # ---------------------------------------------------------------------
+  docs:
+    name: Build docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # --strict turns mkdocs warnings into errors. Broken links, missing
+      # nav targets, and malformed docstrings all fail CI here.
+      - name: Build docs (strict)
+        run: uv run mkdocs build --strict
+
+  # ---------------------------------------------------------------------
+  # Dependency review on PRs only. Flags newly-introduced dependencies
+  # with known CVEs and license incompatibilities. No-op on direct pushes
+  # to main (no diff to review).
+  # ---------------------------------------------------------------------
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

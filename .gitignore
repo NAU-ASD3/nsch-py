@@ -1,0 +1,81 @@
+# --- Project-specific ---------------------------------------------------
+# CLAUDE.md is a per-developer context file that lives at the repo root
+# but is never committed. See the personal development notes for details.
+CLAUDE.md
+
+# Real NSCH data files — too large to commit, and may contain
+# pre-release public-use files under embargo.
+data/
+*.dta
+*.do
+!tests/data/*.dta
+!tests/data/*.do
+
+# --- Python -------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual environments / uv -----------------------------------------
+.venv/
+venv/
+env/
+.python-version.local
+
+# --- Testing / coverage -------------------------------------------------
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# --- Type checking -----------------------------------------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# --- Documentation -----------------------------------------------------
+site/
+.mkdocs_cache/
+
+# --- IDEs --------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# --- Jupyter -----------------------------------------------------------
+.ipynb_checkpoints/
+*.ipynb
+
+# --- Logs --------------------------------------------------------------
+*.log

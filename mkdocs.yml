@@ -1,0 +1,66 @@
+site_name: nsch
+site_description: NSCH data preparation toolkit
+site_url: https://nau-asd3.github.io/nsch-py/
+repo_url: https://github.com/NAU-ASD3/nsch-py
+repo_name: NAU-ASD3/nsch-py
+edit_uri: edit/main/docs/
+
+# Fail the build on warnings (broken links, missing nav targets, etc.).
+# CI runs `mkdocs build --strict`, which makes this enforcement automatic.
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  # API reference, design decisions, and operational docs will be added
+  # as the package gains functions in subsequent PRs.

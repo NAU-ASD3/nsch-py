@@ -1,0 +1,57 @@
+name: Release
+
+# Triggered by pushing a tag matching v* (e.g. v2026.5.27).
+# Builds wheel + sdist and uploads them to a GitHub Release.
+# PyPI publication is deliberately not configured for v1 — add when needed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write  # Required to create the GitHub Release.
+
+jobs:
+  release:
+    name: Build and publish to GitHub Releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Verify tag matches package version
+        run: |
+          # Tag format: v2026.5.27. Strip the leading "v" to get the bare version.
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(uv run python -c "from importlib.metadata import version; print(version('nsch'))" 2>/dev/null \
+            || grep '^version = ' pyproject.toml | sed -E 's/version = "(.+)"/\1/')
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match pyproject.toml version ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "Releasing version $PKG_VERSION"
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Verify dist contents
+        run: |
+          ls -la dist/
+          test -n "$(ls dist/*.whl 2>/dev/null)"
+          test -n "$(ls dist/*.tar.gz 2>/dev/null)"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          # Mark as pre-release if version contains an alpha/beta/rc suffix.
+          # Date-format versions (2026.5.27) are treated as stable.
+          prerelease: ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') }}
