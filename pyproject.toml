@@ -55,7 +55,7 @@ dev = [
     "mypy>=1.10",
     "pre-commit>=3.7",
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.25",
+    "mkdocstrings[python]>=1.0.4",
 ]
 
 # --- Ruff (lint + format) -------------------------------------------------
