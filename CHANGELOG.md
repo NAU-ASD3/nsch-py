@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## [2026.6.17] - 2026-06-17
+
+- Added _types module with the TaggedNA sentinel scheme (#N)
+
 ## [2026.5.27] — 2026-05-27
 
 ### Added
