@@ -40,3 +40,13 @@ def test_renames_the_label_companion_too() -> None:
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["k4q02_r", "k4q02_r_label"]
     assert result["k4q02_r_label"].to_list() == ["Clinic", "Other"]
+
+
+def test_applies_several_rules_in_one_call() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2], "hhid": [3]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
+        "family_r": {"years": ["2023"], "new_name": "family"},
+    }
+    result = rename_vars(lf, renames, 2023).collect()
+    assert result.columns == ["k4q02_r", "family", "hhid"]
