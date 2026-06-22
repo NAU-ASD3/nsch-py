@@ -25,3 +25,10 @@ def test_leaves_columns_unchanged_for_a_nonmatching_year() -> None:
     # 2016 isn't in the rule's years, so the column keeps its source name.
     result = rename_vars(lf, renames, 2016).collect()
     assert result.columns == ["gowhensick"]
+
+
+def test_ignores_rules_for_columns_that_are_absent() -> None:
+    lf = pl.LazyFrame({"hhid": [10, 20, 30]})
+    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    result = rename_vars(lf, renames, 2023).collect()
+    assert result.columns == ["hhid"]

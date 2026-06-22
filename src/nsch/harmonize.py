@@ -22,10 +22,11 @@ class RenameRule(TypedDict):
 
 
 def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> pl.LazyFrame:
+    present = set(lf.collect_schema().names())
     year_str = str(year)
     mapping: dict[str, str] = {}
     for old, rule in renames.items():
-        if year_str not in rule["years"]:
+        if year_str not in rule["years"] or old not in present:
             continue
         mapping[old] = rule["new_name"]
     return lf.rename(mapping)
