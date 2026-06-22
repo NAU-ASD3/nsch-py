@@ -32,3 +32,11 @@ def test_ignores_rules_for_columns_that_are_absent() -> None:
     renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["hhid"]
+
+
+def test_renames_the_label_companion_too() -> None:
+    lf = pl.LazyFrame({"gowhensick": [4, 8], "gowhensick_label": ["Clinic", "Other"]})
+    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    result = rename_vars(lf, renames, 2023).collect()
+    assert result.columns == ["k4q02_r", "k4q02_r_label"]
+    assert result["k4q02_r_label"].to_list() == ["Clinic", "Other"]

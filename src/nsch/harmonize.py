@@ -28,5 +28,9 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
     for old, rule in renames.items():
         if year_str not in rule["years"] or old not in present:
             continue
-        mapping[old] = rule["new_name"]
+        new_name = rule["new_name"]
+        mapping[old] = new_name
+        old_label = f"{old}_label"
+        if old_label in present:
+            mapping[old_label] = f"{new_name}_label"
     return lf.rename(mapping)
