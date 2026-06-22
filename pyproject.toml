@@ -1,13 +1,11 @@
 [project]
 name = "nsch"
-version = "2026.6.17"
+version = "2026.6.22"
 description = "NSCH data preparation toolkit: download, harmonize, and combine National Survey of Children's Health data across years."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [
-    { name = "ASD3 Outcomes Project, Northern Arizona University" },
-]
+authors = [{ name = "ASD3 Outcomes Project, Northern Arizona University" }]
 keywords = ["nsch", "survey", "data", "harmonization", "polars"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -84,8 +82,22 @@ extend-exclude = ["docs/", "*.ipynb"]
 #   ERA        — eradicate (commented-out code)
 #   RUF        — ruff-specific rules
 select = [
-    "E", "W", "F", "I", "N", "UP", "B", "A", "C4",
-    "SIM", "TCH", "PTH", "ARG", "RET", "ERA", "RUF",
+    "E",
+    "W",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "A",
+    "C4",
+    "SIM",
+    "TCH",
+    "PTH",
+    "ARG",
+    "RET",
+    "ERA",
+    "RUF",
 ]
 ignore = [
     # Allow `Any` in narrow cases (Stata reader returns; will be tightened
@@ -121,7 +133,7 @@ show_column_numbers = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unreachable = true
-disallow_any_unimported = false  # pyreadstat lacks types; we wrap it.
+disallow_any_unimported = false # pyreadstat lacks types; we wrap it.
 # Type-check the source package, not tests (tests need looser typing for
 # fixture construction). Tests are still type-checked at top level but with
 # relaxed rules below.
@@ -152,7 +164,7 @@ addopts = [
     "-ra",
     "--import-mode=importlib",
 ]
-xfail_strict = true  # An xfail test that passes is a CI failure.
+xfail_strict = true # An xfail test that passes is a CI failure.
 markers = [
     "slow: tests that take more than a second to run",
     "integration: tests that require real NSCH data (env-gated)",
@@ -162,7 +174,7 @@ markers = [
 [tool.coverage.run]
 source = ["src/nsch"]
 branch = true
-parallel = true  # supports pytest-xdist
+parallel = true       # supports pytest-xdist
 
 [tool.coverage.report]
 # 85% is the floor; ratchet upward over time, never downward.
@@ -174,7 +186,7 @@ exclude_also = [
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
-    "\\.\\.\\.",  # ellipsis in protocol/abstract method bodies
+    "\\.\\.\\.",                  # ellipsis in protocol/abstract method bodies
 ]
 
 [tool.coverage.paths]

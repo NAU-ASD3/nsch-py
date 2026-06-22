@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## [2026.6.22] - 2026-06-22
+
+- Added `rename_vars` for per-year column renaming (#NN)
+
 ## [2026.6.17] - 2026-06-17
 
 - Added _types module with the TaggedNA sentinel scheme (#8)
