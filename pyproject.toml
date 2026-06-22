@@ -48,10 +48,10 @@ packages = ["src/nsch"]
 # who install the package via pip from a wheel.
 [dependency-groups]
 dev = [
-    "pytest>=9.1.0",
+    "pytest>=9.1.1",
     "pytest-cov>=5.0",
     "pytest-xdist>=3.5",
-    "ruff>=0.15.17",
+    "ruff>=0.15.18",
     "mypy>=1.10",
     "pre-commit>=3.7",
     "mkdocs-material>=9.5",
