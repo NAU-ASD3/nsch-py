@@ -9,7 +9,7 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [2026.6.22] - 2026-06-22
 
-- Added `rename_vars` for per-year column renaming (#NN)
+- Added `rename_vars` for per-year column renaming (#32)
 
 ## [2026.6.17] - 2026-06-17
 
