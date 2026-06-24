@@ -6,22 +6,18 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel any in-progress run for the same branch/PR when a new commit lands.
-# Saves CI minutes on rapid push cycles during development.
+# Cancel an in-progress run when a newer commit lands on the same branch or PR.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Minimal token scope by default; jobs that need more permissions
-# (docs deploy, dependency review) request them explicitly.
+# Least-privilege default. The dependency-review job requests more on its own.
 permissions:
   contents: read
 
 jobs:
-  # ---------------------------------------------------------------------
-  # Lint + format check + type check.
-  # Runs on a single Python version for speed; full matrix is in `test`.
-  # ---------------------------------------------------------------------
+  # Lint, format, and type checks. One Python version is enough here; the full
+  # version matrix lives in the test job.
   lint:
     name: Lint, format, type-check
     runs-on: ubuntu-latest
@@ -49,38 +45,34 @@ jobs:
       - name: mypy strict
         run: uv run mypy src/
 
-  # ---------------------------------------------------------------------
-  # Test matrix across supported Python versions.
-  # Mirrors the R repo's oldrel/release/devel discipline.
-  # Also runs a "floor check" on the oldest supported Python to ensure the code
-  # doesn't rely on newer versions of dependencies than advertised.
-  # Coverage is gathered from the newest Python row only (avoids
-  # duplicate reports) but tests must pass on all rows.
-  # ---------------------------------------------------------------------
+  # Test the full supported Python range on Linux, the newest Python on macOS
+  # and Windows, and one row pinned to the lowest declared dependency versions
+  # to keep our lower bounds honest.
   test:
-    name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
+    name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }}${{ matrix.resolution == 'lowest-direct' && ', lowest-direct' || '' }})
     runs-on: ${{ matrix.os }}
-    # Run every step under bash so the multi-line test command behaves the same
-    # on Windows (which defaults to PowerShell) as on Linux and macOS.
+    # Force bash on every OS so the multi-line test command behaves the same on
+    # Windows, which otherwise defaults to PowerShell.
     defaults:
       run:
         shell: bash
     strategy:
-      fail-fast: false # Don't cancel other matrix jobs on first failure.
+      fail-fast: false  # Let every row report instead of stopping at the first failure.
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        resolution: [highest]
         include:
-          # Sanity-check macOS and Windows on the newest Python only — catches
-          # platform-specific bugs (path separators, file encoding) without
-          # running the full grid on every OS.
+          # Newest Python on the other two OSes, to catch platform-specific
+          # bugs (path separators, file encoding) without running the full grid
+          # everywhere.
           - os: macos-latest
             python-version: "3.14"
           - os: windows-latest
             python-version: "3.14"
-          # Floor check: resolve the minimum declared version of every direct
-          # dependency on the oldest supported Python. Fails if the code starts
-          # relying on something newer than a lower bound we still advertise.
+          # Floor check: oldest Python with the minimum declared version of
+          # every direct dependency. Fails if the code starts relying on
+          # something newer than a lower bound we still advertise.
           - os: ubuntu-latest
             python-version: "3.11"
             resolution: lowest-direct
@@ -97,8 +89,6 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        # Every row uses the default (highest) resolution except the
-        # lowest-direct floor check, which re-resolves to the minimums.
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution ${{ matrix.resolution || 'highest' }}
 
       - name: Run tests
@@ -109,9 +99,9 @@ jobs:
               --cov-report=xml \
               --cov-report=term-missing
 
-      # Upload coverage to Codecov from a single Linux row (3.13) to avoid
-      # duplicate reports. The 85% threshold is enforced inside pytest via
-      # `[tool.coverage.report] fail_under = 85`; Codecov is for visualization.
+      # Upload coverage once, from the Linux 3.13 row, to avoid duplicate
+      # reports. The 85% gate is enforced in pytest via
+      # [tool.coverage.report] fail_under; Codecov is only for visualization.
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
         uses: codecov/codecov-action@v7
@@ -120,11 +110,8 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # ---------------------------------------------------------------------
-  # Verify the package builds cleanly. Catches packaging bugs
-  # (missing data files, invalid metadata, src/ layout misconfigurations)
-  # that test runs alone won't catch.
-  # ---------------------------------------------------------------------
+  # Build the wheel and sdist so packaging bugs (missing data files, bad
+  # metadata, src-layout slips) surface here instead of at release time.
   build:
     name: Build wheel + sdist
     runs-on: ubuntu-latest
@@ -135,20 +122,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Build
+      - name: Build wheel and sdist
         run: uv build
 
-      - name: Check distribution metadata
+      - name: Verify the distribution
         run: |
-          uv tool run --from build pyproject-build --installer uv 2>/dev/null || true
           ls -la dist/
-          # Sanity check: both wheel and sdist must be produced.
+          # Both a wheel and an sdist must be produced.
           test -n "$(ls dist/*.whl 2>/dev/null)"
           test -n "$(ls dist/*.tar.gz 2>/dev/null)"
+          # Validate the rendered package metadata.
+          uvx twine check dist/*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -157,11 +146,8 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ---------------------------------------------------------------------
-  # Verify the documentation site builds without errors.
-  # A docs-only PR can otherwise land broken mkdocs config that breaks
-  # the published site on the next merge.
-  # ---------------------------------------------------------------------
+  # Build the docs with --strict so broken links, missing nav targets, or
+  # malformed docstrings fail here before they reach the published site.
   docs:
     name: Build docs
     runs-on: ubuntu-latest
@@ -172,6 +158,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.13
@@ -179,20 +166,19 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      # --strict turns mkdocs warnings into errors. Broken links, missing
-      # nav targets, and malformed docstrings all fail CI here.
       - name: Build docs (strict)
         run: uv run mkdocs build --strict
 
-  # ---------------------------------------------------------------------
-  # Dependency review on PRs only. Flags newly-introduced dependencies
-  # with known CVEs and license incompatibilities. No-op on direct pushes
-  # to main (no diff to review).
-  # ---------------------------------------------------------------------
+  # Flag new dependencies with known CVEs or incompatible licenses. Runs on
+  # PRs only, since a direct push has no diff to review.
   dependency-review:
     name: Dependency review
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    # Reads the dependency graph and, on a finding, comments on the PR.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v4
