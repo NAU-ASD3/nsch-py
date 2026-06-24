@@ -1,7 +1,7 @@
 # nsch
 
 [![CI](https://github.com/NAU-ASD3/nsch-py/actions/workflows/ci.yml/badge.svg)](https://github.com/NAU-ASD3/nsch-py/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Python toolkit for downloading, harmonizing, and combining National Survey of Children's Health (NSCH) data across survey years.
@@ -18,13 +18,13 @@ Pre-1.0. APIs may change. The package is being developed under the NAU ASD3 Outc
 ## Installation
 
 ```bash
-# As a user, once published:
-pip install nsch
-
-# For development (recommended: uv):
+# For development, and for now the only way to install (uv recommended):
 git clone https://github.com/NAU-ASD3/nsch-py
 cd nsch-py
 uv sync --group dev
+
+# As a user, once a release is published:
+pip install nsch
 ```
 
 ## Quick start
@@ -57,7 +57,7 @@ This package centralizes those rules in a single audited configuration and appli
 
 ## Documentation
 
-Full documentation is published at <https://nau-asd3.github.io/nsch-py/>. The API reference, design decisions, and a runbook for incorporating a new survey year all live there.
+Full documentation is published at <https://nau-asd3.github.io/nsch-py/>: an onboarding guide, a development walkthrough, and the design decisions behind the package. A function-level API reference will be added as the package gains functions.
 
 ## Contributing
 

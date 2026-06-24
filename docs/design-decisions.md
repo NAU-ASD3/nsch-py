@@ -1,11 +1,16 @@
 # Design decisions
 
-This document records the technical decisions behind `nsch-py` — what was
+This document records the technical decisions behind `nsch-py`: what was
 chosen, what was considered, and why. It is written for new technical
 reviewers joining the team who know Python and dataframes but have not
 worked with Stata files or with this project's history. It is *not* an API
-reference or a usage tutorial; for those see the auto-generated reference
-and the README.
+reference or a usage tutorial; for those, see the README.
+
+> **Work in progress.** This page describes the target architecture and the
+> reasoning behind it. Several of the modules and functions named below (the
+> read layer, the harmonize and combine stages, the pipeline orchestrator, the
+> config models) are still being built. The design is settled; the code is
+> landing one function at a time.
 
 A through-line runs through every section: Stata stores four distinct
 missingness types per variable, and preserving those four types end-to-end
@@ -15,8 +20,8 @@ is the single requirement that shapes the rest of the design.
 
 ## 1. Why we read `.dta` + `.do` files directly, not CSV intermediates
 
-The NSCH is published as Stata files. The natural first instinct — and the
-path most non-Stata-native pipelines take — is to convert each year to CSV
+The NSCH is published as Stata files. The natural first instinct, and the
+path most non-Stata-native pipelines take, is to convert each year to CSV
 once, then build the rest of the pipeline on the CSVs. `nsch-py` does not.
 
 ### Stata's four tagged-NA types
@@ -26,16 +31,16 @@ variable: a plain `.`, and four *tagged* missing values `.m`, `.n`, `.l`,
 `.d`. Each tag is a distinct in-memory value; CAHMI uses them in NSCH to
 encode the *reason* a value is missing:
 
-- `.m` — no valid response (missing for an unknown reason).
-- `.n` — not in universe (the question did not apply, e.g. school
+- `.m`: no valid response (missing for an unknown reason).
+- `.n`: not in universe (the question did not apply, e.g. school
   enrollment for an infant).
-- `.l` — logical skip (earlier answers caused the survey to skip this
+- `.l`: logical skip (earlier answers caused the survey to skip this
   item).
-- `.d` — suppressed by CAHMI for confidentiality before release.
+- `.d`: suppressed by CAHMI for confidentiality before release.
 
 These distinctions are not cosmetic. "Not in universe" is structurally
-different from "didn't answer", and downstream analyses — rate
-denominators, imputation eligibility, model masking — need to treat them
+different from "didn't answer", and downstream analyses (rate
+denominators, imputation eligibility, model masking) need to treat them
 differently.
 
 ### What CSV does to them
@@ -43,12 +48,12 @@ differently.
 CSV has no encoding for tagged missingness. Exporting a Stata variable to
 CSV collapses every one of `.`, `.m`, `.n`, `.l`, `.d` to the same empty
 field; re-reading yields a single `null` per row with no way to recover
-which tag was originally present. The loss is one-way and silent — by the
+which tag was originally present. The loss is one-way and silent: by the
 time the CSV reader sees the file, the information is already gone. The
 same loss occurs through any format without tagged-NA semantics: a
 single-NA `pandas.read_stata` call, a naive Parquet writer that collapses
 missingness to `null`, and so on. The fix is not "be careful with the CSV
-step" — it is to not have a CSV step.
+step." It is to not have a CSV step.
 
 ### The decision
 
@@ -84,11 +89,11 @@ while excluding `997` and `998`.
 Polars has the better philosophical fit with the project's reference
 implementation. The R `nsch` package is written in `data.table` style:
 expression-driven, no row index, in-memory by default, with a query
-optimizer. Polars's API is a near-direct analogue — the same expression
-idioms, the same "rows are positional, columns are named" data model —
-where Pandas's row index and method-chained mutation style are a constant
-source of friction for a `data.table`-shaped mind. Cross-language code
-review is easier when both halves read the same way.
+optimizer. Polars's API is a near-direct analogue, with the same
+expression idioms and the same "rows are positional, columns are named"
+data model, where Pandas's row index and method-chained mutation style
+are a constant source of friction for a `data.table`-shaped mind.
+Cross-language code review is easier when both halves read the same way.
 
 Several secondary considerations point the same direction:
 
@@ -109,8 +114,8 @@ Several secondary considerations point the same direction:
 
 Pandas has a substantially larger ecosystem. Most scikit-learn-style ML
 APIs expect Pandas inputs, and the modeling layer that consumes `nsch`
-output is in that camp. The cost is paid at one place — the boundary
-between data prep and modeling — with a single `.to_pandas()` call:
+output is in that camp. The cost is paid at one place, the boundary
+between data prep and modeling, with a single `.to_pandas()` call:
 
 ```python
 from nsch import get_clean_data
@@ -136,7 +141,7 @@ can exist at all: tagged-NA preservation.
 
 `pandas.read_stata` has no equivalent of pyreadstat's `user_missing=True`
 flag. Every tagged-NA value collapses to a single `NaN` in the resulting
-DataFrame, and the tag is discarded — the same loss as the CSV path in
+DataFrame, and the tag is discarded, the same loss as the CSV path in
 §1, just done in memory rather than on disk.
 
 `pyreadstat.read_dta(path, user_missing=True)` returns each tagged value
@@ -210,8 +215,8 @@ feasible at all. A different convention would force translation at the
 test boundary, and translation masks real divergences.
 
 **The pipeline stays numeric until factor conversion.** Most
-harmonization transforms — value remapping, column merging, year-specific
-renames — operate on integer-coded variables directly. Keeping the
+harmonization transforms (value remapping, column merging, year-specific
+renames) operate on integer-coded variables directly. Keeping the
 tagged-NA values as integers in the same column lets those transforms
 compose cleanly without ever special-casing missingness. When a variable
 finally becomes a categorical via `src/nsch/harmonize.apply_do_labels`,
@@ -246,8 +251,8 @@ the specific numbers are arbitrary except for matching the R version.
 
 ## 5. Why the pipeline is `LazyFrame` end-to-end
 
-Polars has two materialization modes: `DataFrame` (eager — every
-operation runs immediately) and `LazyFrame` (deferred — operations build
+Polars has two materialization modes: `DataFrame` (eager, every
+operation runs immediately) and `LazyFrame` (deferred, operations build
 a plan that the query optimizer executes when `.collect()` is called).
 `nsch-py` is written end-to-end in the lazy mode.
 
@@ -301,15 +306,15 @@ step collapses to eager:
   iteration.
 
 In an eager pipeline, each step would materialize an intermediate frame
-and the optimizer would have no visibility past the current call — the
+and the optimizer would have no visibility past the current call, so the
 work above would happen N times for an N-step chain.
 
 ### The discipline that keeps it lazy
 
 Type signatures enforce the mode. Every harmonize/combine/pipeline
 function annotates input and return as `pl.LazyFrame`. A function that
-accidentally returns a `DataFrame` — the result of an unnecessary
-`.collect()` — is caught by `mypy --strict`. The lazy/eager boundary
+accidentally returns a `DataFrame`, the result of an unnecessary
+`.collect()`, is caught by `mypy --strict`. The lazy/eager boundary
 becomes visible at the type level.
 
 The only authorized `.collect()` in the core pipeline is inside
@@ -339,21 +344,21 @@ The pipeline is small enough that function composition is clearer. The
 entire flow is six stages per year and one combine step; a reviewer
 reads `harmonize_year` and `combine_years` end-to-end in a few minutes
 and sees the whole shape of the work. A DAG declaration puts the same
-information in a separate registry — readable, but no longer next to
-the code — and adds vocabulary a `data.table`-shaped reviewer has to
+information in a separate registry (readable, but no longer next to
+the code) and adds vocabulary a `data.table`-shaped reviewer has to
 learn before reading the pipeline at all.
 
 Caching trades complexity for a speedup not currently needed. A full
 2016–2024 run takes a few minutes on a laptop. The variable-config
 file is the only input that changes meaningfully between runs, and a
-config change typically invalidates most downstream stages anyway — the
+config change typically invalidates most downstream stages anyway, so the
 case where targets-style caching wins (one stage's inputs change, the
 rest reuse) is rare here. Caches also have to be invalidated correctly,
 and silent staleness in a data-prep cache produces subtly wrong outputs
 with no error to trace.
 
-The escape hatch is open. If pipeline runtime becomes a bottleneck — for
-instance, in HPC sweeps where many reruns per day is normal — wrapping
+The escape hatch is open. If pipeline runtime becomes a bottleneck, for
+instance in HPC sweeps where many reruns per day is normal, wrapping
 the existing stages as targets or Prefect tasks is mechanical. The
 harmonize functions already have the right shape: pure, typed inputs,
 no shared state. What's hard to undo is committing to a framework early
@@ -364,7 +369,7 @@ awkward.
 
 ## 7. Why Pydantic for config validation
 
-The harmonization rules live in `src/nsch/data/variable-config.json` —
+The harmonization rules live in `src/nsch/data/variable-config.json`:
 which variables to keep, which to rename per year, which to merge, and
 which value remappings to apply. The R version validates this file with
 `validate_config()`, roughly 60 lines of hand-written field checks. The
@@ -416,24 +421,24 @@ Beyond the line-count win, two benefits matter. The models are
 executable schema: a reviewer who wants to know what fields
 `TransformRule` has reads the class definition, and there is no parallel
 documentation to drift out of sync with the implementation. And
-downstream code is type-checked — the harmonize layer accesses config
+downstream code is type-checked: the harmonize layer accesses config
 via attribute syntax (`config.transformations.transform[var].years`),
 and `mypy --strict` verifies that `.years` exists and is a `list[str]`
 at every callsite. A dict-access alternative cannot be checked at all;
 a typo or a renamed field would only fail at runtime on the row that
 happens to need it.
 
-Advanced Pydantic features — custom serializers, generic models,
-`mode="before"` validators — are deliberately not used; the models above
+Advanced Pydantic features (custom serializers, generic models,
+`mode="before"` validators) are deliberately not used; the models above
 are the entire pattern in the package.
 
 ---
 
 ## Where to read next
 
-- The README for the package's user-facing pitch and quick start.
-- The API reference for function-level documentation, under `api/`.
-- `nsch-python-migration-plan.md` in the repo root for the fuller
-  historical context — trade-offs considered and rejected when porting
-  from R, and the function-by-function mapping between the two
-  implementations.
+- The README for the package's user-facing overview and quick start.
+- The [Onboarding](onboarding.md) guide and the
+  [Development walkthrough](development-walkthrough.md) for how the work
+  actually gets done day to day.
+- Function-level API reference, which will be generated under `api/` as
+  the functions land.
