@@ -31,7 +31,10 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     all_years = set(df["year"].sort())
     n_years_total = len(all_years)
 
-    out_list = []
+    variables: list[str] = []
+    n_years_data: list[int] = []
+    n_years_total_list: list[int] = []
+    missing_years: list[str] = []
 
     for i in range(0, len(var_names)):
         col = var_names[i]
@@ -39,23 +42,17 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         years_with_data = year_counts.filter(pl.col("n_non_na") > 0)["year"]
         years_missing = list(all_years.difference(years_with_data))
 
-        out_list.append(
-            {
-                "variable": col,
-                "n_years_data": years_with_data.len(),
-                "n_years_total": n_years_total,
-                # missing years list should be a single string
-                "missing_years": ", ".join(years_missing),
-            }
-        )
+        variables.append(col)
+        n_years_data.append(years_with_data.len())
+        n_years_total_list.append(n_years_total)
+        missing_years.append(", ".join(years_missing))
 
     return pl.DataFrame(
-        out_list,
-        schema=[
-            ("variable", pl.String),
-            ("n_years_data", pl.Int64),
-            ("n_years_total", pl.Int64),
-            ("missing_years", pl.String),
-        ],
+        {
+            "variable": variables,
+            "n_years_data": n_years_data,
+            "n_years_total": n_years_total_list,
+            "missing_years": missing_years,
+        },
         orient="row",
     )
