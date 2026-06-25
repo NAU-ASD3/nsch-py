@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## [2026.6.25] - 2026-06-25
+
+- Added `check_year_coverage` to report per-variable year coverage (#33)
+
 ## [2026.6.17] - 2026-06-17
 
 - Added _types module with the TaggedNA sentinel scheme (#8)
