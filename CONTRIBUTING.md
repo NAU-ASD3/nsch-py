@@ -16,7 +16,7 @@ uv sync --group dev
 uv run pre-commit install
 ```
 
-`uv sync` installs all runtime and development dependencies into a project-local virtual environment at `.venv/`. You do not need to activate it — `uv run <command>` handles that.
+`uv sync` installs all runtime and development dependencies into a project-local virtual environment at `.venv/`. You do not need to activate it; `uv run <command>` handles that.
 
 ## Running things
 
@@ -95,7 +95,7 @@ We use a stacked-PR workflow: each PR depends only on earlier PRs in the stack, 
 
 For stacked PRs, the first line of the PR description must be:
 
-> ⚠️ Stacked PR — branches from `<parent_branch>` (#<parent_PR>). Only files listed below are new; others belong to parent PR.
+> ⚠️ Stacked PR: branches from `<parent_branch>` (#<parent_PR>). Only files listed below are new; others belong to parent PR.
 
 followed by an explicit list of new files. Check the **Files changed** tab before requesting review to confirm you aren't sending duplicated work.
 
@@ -112,7 +112,7 @@ PR titles use the imperative mood, lowercase: `add transform_values for per-year
 
 ## Adding a dependency
 
-Runtime dependencies are reviewed carefully — each one is a maintenance cost. Before adding one:
+Runtime dependencies are reviewed carefully, because each one is a maintenance cost. Before adding one:
 
 1. Verify the functionality isn't already available in the standard library or in an existing dependency.
 2. Confirm the package is actively maintained (recent releases, open issues triaged).
