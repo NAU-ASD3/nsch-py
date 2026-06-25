@@ -26,6 +26,12 @@ import polars as pl
 
 
 def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
+    # make sure input df is a polars DataFrame and contains a year column
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Input must be a polars DataFrame.")
+    if "year" not in df.columns:
+        raise ValueError("Input DataFrame must contain a 'year' column.")
+
     var_names = df.columns
     var_names.remove("year")
     all_years = set(df["year"].sort())
@@ -36,16 +42,17 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     n_years_total_list: list[int] = []
     missing_years: list[str] = []
 
-    for i in range(0, len(var_names)):
-        col = var_names[i]
-        year_counts = df.group_by("year").agg(pl.col(col).is_not_null().sum().alias("n_non_na"))
-        years_with_data = year_counts.filter(pl.col("n_non_na") > 0)["year"]
-        years_missing = list(all_years.difference(years_with_data))
+    if len(var_names) > 0:
+        for i in range(0, len(var_names)):
+            col = var_names[i]
+            year_counts = df.group_by("year").agg(pl.col(col).is_not_null().sum().alias("n_non_na"))
+            years_with_data = year_counts.filter(pl.col("n_non_na") > 0)["year"]
+            years_missing = list(all_years.difference(years_with_data))
 
-        variables.append(col)
-        n_years_data.append(years_with_data.len())
-        n_years_total_list.append(n_years_total)
-        missing_years.append(", ".join(years_missing))
+            variables.append(col)
+            n_years_data.append(years_with_data.len())
+            n_years_total_list.append(n_years_total)
+            missing_years.append(", ".join(sorted(years_missing)))
 
     return pl.DataFrame(
         {
