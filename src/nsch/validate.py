@@ -1,4 +1,4 @@
-"""Per-variable year coverage for the validate
+"""Per-variable year coverage for the validate module
 
 ``check_year_coverage`` checks, for each column excluding `year`,
 at least one non-NA value in each year present in the data. It accepts
