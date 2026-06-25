@@ -1,4 +1,4 @@
-"""Test check_year_coverage()"""
+"""Tests for Validate module"""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import polars as pl
 import pytest
 
 from nsch.validate import check_year_coverage
-
-# Behaviors to check:
 
 
 # correct output format (Names, data table type)
