@@ -9,7 +9,7 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [2026.6.25] - 2026-06-25
 
-- Added `check_year_coverage` to report per-variable year coverage (#33)
+- Added `check_year_coverage` to report per-variable year coverage (#38)
 
 ## [2026.6.17] - 2026-06-17
 
