@@ -29,6 +29,15 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         A per-column summary of the total number of years, total number of years
         with data, and a list of years which are entirely NA for that column.
 
+    Notes
+    -----
+    Empty results
+        When no rows match, the public functions still return a Polars DataFrame
+        with the canonical four columns and their declared dtypes.
+        This is intentional: callers can always do ``df["col"]`` or check
+        ``df.is_empty()`` without first guarding against a missing column.
+        Contrast with R's ``rbindlist(list())`` which returns a 0x0 frame.
+
     Examples
     --------
     >>> import polars as pl
@@ -75,14 +84,21 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
             n_years_data.append(years_with_data.len())
             n_years_total_list.append(n_years_total)
             # Turn the list of missing years into a comma-separated string
-            missing_years.append(", ".join(sorted(years_missing)))
+            missing_years.append(",".join(str(y) for y in sorted(years_missing)))
 
+    # An empty dataframe returns a typed empty dataframe unlike R's 0x0 return frame
     return pl.DataFrame(
         {
             "variable": variables,
             "n_years_data": n_years_data,
             "n_years_total": n_years_total_list,
             "missing_years": missing_years,
+        },
+        schema={
+            "variable": pl.Utf8,
+            "n_years_data": pl.Int64,
+            "n_years_total": pl.Int64,
+            "missing_years": pl.Utf8,
         },
         orient="row",
     )
