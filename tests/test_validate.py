@@ -4,33 +4,17 @@ from __future__ import annotations
 
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from nsch.validate import check_year_coverage
 
 
-# correct output format (Names, data table type)
-def test_output_format():
-    df = pl.DataFrame({"year": ["2016", "2017"], "x": [1, 2]})
-    result = check_year_coverage(df)
-    assert isinstance(result, pl.DataFrame)
-    assert set(result.columns) == {"variable", "n_years_data", "n_years_total", "missing_years"}
+def test_correct_output_format_and_missing_years():
+    # Checks correct output format (column names, data table type)
+    # Flags variables that are entirely NA for one or more years
+    # Checks whether a fully covered variable has at least one non-NA value
+    # in each year present in the data. (All data present for that variable)
 
-
-# Contains year column
-def test_contains_year_column():
-    df = pl.DataFrame({"x": [1, 2]})
-    try:
-        check_year_coverage(df)
-    except ValueError as e:
-        assert str(e) == "Input DataFrame must contain a 'year' column."
-    else:
-        pytest.fail("Expected ValueError not raised.")
-
-
-# Flags variables that are entirely \code{NA} for one or more years
-# List years all NA (multiple NA Years)
-# And where one year has some NA (at least one NA)
-def test_identifies_variable_entirely_NA_in_multiple_years():
     df = pl.DataFrame(
         {
             "year": ["2016", "2016", "2017", "2017", "2018", "2018"],
@@ -39,30 +23,53 @@ def test_identifies_variable_entirely_NA_in_multiple_years():
         }
     )
     result = check_year_coverage(df)
-    # Rather than assuming the order of the output,
-    # filter for the variable of interest
-    row = result.filter(pl.col("variable") == "y")
-    assert row["n_years_data"][0] == 1
-    assert row["n_years_total"][0] == 3
-    assert row["missing_years"][0] == "2017, 2018"
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y"],
+            "n_years_data": [3, 1],
+            "n_years_total": [3, 3],
+            "missing_years": ["", "2017,2018"],
+        }
+    )
+    assert_frame_equal(result, expected)
 
 
-# One year all NA (Single NA year)
+def test_contains_year_column():
+    # Check contains year column
+    df = pl.DataFrame({"x": [1, 2]})
+    with pytest.raises(ValueError, match="year"):
+        check_year_coverage(df)
+
+
 def test_identifies_variable_entirely_NA_in_one_year():
+    # One year all NA (Single NA year)
     df = pl.DataFrame(
         {"year": ["2016", "2016", "2017", "2017"], "x": [1, 2, 3, 4], "y": [1, 2, None, None]}
     )
     result = check_year_coverage(df)
-    row = result.filter(pl.col("variable") == "y")
-    assert row["n_years_data"][0] == 1
-    assert row["n_years_total"][0] == 2
-    assert row["missing_years"][0] == "2017"
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y"],
+            "n_years_data": [2, 1],
+            "n_years_total": [2, 2],
+            "missing_years": ["", "2017"],
+        }
+    )
+    assert_frame_equal(result, expected)
 
 
-# checks whether it has at least one non-NA value in each year present in the data.
-# No years with NA (All data present)
-def test_fully_covered_variable_has_empty_missing_years():
-    df = pl.DataFrame({"year": ["2016", "2017"], "x": [1, 2]})
+def test_empty_dataframe_returns_typed_empty_dataframe():
+    # Checks that empty DataFrame returns a typed empty DataFrame
+    # with the canonical four columns and their declared dtypes.
+    df = pl.DataFrame({"year": []})
     result = check_year_coverage(df)
-    row = result.filter(pl.col("variable") == "x")
-    assert row["missing_years"][0] == ""
+    assert isinstance(result, pl.DataFrame)
+    assert set(result.columns) == {"variable", "n_years_data", "n_years_total", "missing_years"}
+    assert result.is_empty()
+
+
+def test_non_polars_dataframe_raises_type_error():
+    # Check that non-polars DataFrame raises TypeError
+    df = {"year": ["2016", "2016"], "x": [1, 2]}
+    with pytest.raises(TypeError, match="polars"):
+        check_year_coverage(df)
