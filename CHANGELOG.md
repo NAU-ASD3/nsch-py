@@ -9,7 +9,7 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [2026.6.29] - 2026-06-29
 
-- Added `check_na_rates` for checking per-variable NA rates per year (#NN)
+- Added `check_na_rates` for checking per-variable NA rates per year (#44)
 
 ## [2026.6.17] - 2026-06-17
 
