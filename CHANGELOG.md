@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## [2026.6.28] - 2026-06-28
+
+- Added ⁠ check_factor_levels ⁠ for reporting the levels present in each Enum column (#NN)
+
 ## [2026.6.17] - 2026-06-17
 
 - Added _types module with the TaggedNA sentinel scheme (#8)
