@@ -1,10 +1,9 @@
-"""Calculate NA rates per column per year for the validate module
+"""Per-column NA rates per year for the validate module
 
-``check_na_rates`` checks, for each column per year,
-the proportion of NA values for each column, broken down by year.
-Useful for identifying variables with high missingness in
-specific years, or for applying a threshold (e.g. exclude columns with
->10% missing) before downstream analysis.
+``check_na_rates`` calculates the proportion of missing values for each
+column, broken down by year. Useful for identifying variables with high
+missingness in specific years, or for applying a threshold (e.g. exclude
+columns with >10% missing) before downstream analysis.
 """
 
 from __future__ import annotations
@@ -13,19 +12,20 @@ import polars as pl
 
 
 def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
-    """Check NA rates per column per year.
+    """Calculate per-column NA rates by year.
 
-    Parameters:
+    Parameters
     ----------
     df : pl.DataFrame
-        A Polars Dataframe containing a 'year' column
+        A Polars DataFrame containing a ``year`` column
 
-    Returns:
+    Returns
     -------
-    A Polars DataFrame with the columns `variable` (str), `year` (int),
-    `na_rate` (float from 0 to 1), and `n_total` where `na_rate` is the
-    proportion of NA values for each variable per year and `n_total`
-    is the total number of rows for that year.
+    pl.DataFrame
+        A DataFrame with the columns ``variable`` (str), ``year`` (int),
+        ``na_rate`` (float between0 and 1), and ``n_total``. ``na_rate``
+        is the proportion of NA values for each variable per year and
+        ``n_total`` is the total number of rows for that year.
 
     Examples
     --------
@@ -34,7 +34,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     >>> df = pl.DataFrame(
     ...     {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
     ... )
-    >>> check_na_rates(df).sort(["variable", "year"])
+    >>> check_na_rates(df)
     shape: (4, 4)
     ┌──────────┬──────┬─────────┬─────────┐
     │ variable ┆ year ┆ na_rate ┆ n_total │
@@ -55,14 +55,17 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
 
     # Leverage polars strength for column operations: polars unpivot
     return (
-        df.unpivot(index="year", variable_name="variable", value_name="value")
+        # Convert all columns except year to True/False indicating NA status
+        df.select("year", pl.exclude("year").is_null())
+        .unpivot(index="year", variable_name="variable", value_name="is_na")
         .group_by(["year", "variable"])
         .agg(
             [
-                pl.col("value").is_null().sum().alias("n_na").cast(pl.Int64),
-                pl.len().alias("n_total").cast(pl.Int64),
+                pl.col("is_na").sum().cast(pl.Int64).alias("n_na"),
+                pl.len().cast(pl.Int64).alias("n_total"),
             ]
         )
-        .with_columns((pl.col("n_na") / pl.col("n_total")).alias("na_rate").cast(pl.Float64))
+        .with_columns((pl.col("n_na") / pl.col("n_total")).alias("na_rate"))
         .select(["variable", "year", "na_rate", "n_total"])
+        .sort(by=["variable", "year"])
     )
