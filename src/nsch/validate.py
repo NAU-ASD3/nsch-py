@@ -1,11 +1,11 @@
 """Per-variable year coverage for the validate module
 
-``check_year_coverage`` checks, for each column excluding `year`,
-at least one non-NA value in each year present in the data. It accepts
-a collected LazyFrame as a DataFrame and returns DataFrame with a
-per-column summary of the total number of years, total number of years
-with data, and a list of years which are entirely NA for that column.
-It gives a snapshot of missingness in variablse accross survey years.
+``check_year_coverage`` checks that each column (excluding `year`) has
+at least one non-missing value in each year present in the data. It accepts
+a `pl.DataFrame` and returns a `pl.DataFrame` with a per-column summary of the
+total number of years, total number of years with data,
+and a list of years which are entirely missing for that column.
+It gives a snapshot of missingness in variables across survey years.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import polars as pl
 
 
 def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
-    """Report number of years per column present in data.
+    """Report per-variable year coverage across the combined data.
 
 
     Parameters
@@ -26,13 +26,13 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     Returns
     -------
     pl.DataFrame
-        A per-column summary of the total number of years, total number of years
-        with data, and a list of years which are entirely NA for that column.
+        A per-column summary containing the total number of years, the number
+        of years with data, and a list of years for which all values are missing.
 
     Notes
     -----
     Empty results
-        When no rows match, the public functions still return a Polars DataFrame
+        When the input contains no rows, the function still returns a Polars DataFrame
         with the canonical four columns and their declared dtypes.
         This is intentional: callers can always do ``df["col"]`` or check
         ``df.is_empty()`` without first guarding against a missing column.
@@ -69,6 +69,7 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     variables: list[str] = []
     n_years_data: list[int] = []
     n_years_total_list: list[int] = []
+    # years are treated as strings for concatenation in the missing_years column
     missing_years: list[str] = []
 
     for col in var_names:
