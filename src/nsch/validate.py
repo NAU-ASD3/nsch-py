@@ -35,28 +35,34 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     ...     {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
     ... )
     >>> check_na_rates(df)
+    shape: (4, 4)
+    ┌──────────┬──────┬─────────┬─────────┐
+    │ variable ┆ year ┆ na_rate ┆ n_total │
+    │ ---      ┆ ---  ┆ ---     ┆ ---     │
+    │ str      ┆ i64  ┆ f64     ┆ i64     │
+    ╞══════════╪══════╪═════════╪═════════╡
+    │ x        ┆ 2016 ┆ 0.5     ┆ 2       │
+    │ x        ┆ 2017 ┆ 0.0     ┆ 2       │
+    │ y        ┆ 2016 ┆ 1.0     ┆ 2       │
+    │ y        ┆ 2017 ┆ 0.0     ┆ 2       │
+    └──────────┴──────┴─────────┴─────────┘
 
     """
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Input must be a Polars DataFrame")
+    if "year" not in df.columns:
+        raise ValueError("Input DataFrame must contain a 'year' column")
+
     # Leverage polars default to column operations: polars unpivot
-    # unpivot df to long format, with columns year, variable, and value
-    # group by year and variable to look at values fitting only that pair's intersection
     return (
         df.unpivot(index="year", variable_name="variable", value_name="value")
         .group_by(["year", "variable"])
         .agg(
             [
-                # for the grouped pair value intersection, add columns with the
-                # count of the number of NA values and number of total values
                 pl.col("value").is_null().sum().alias("n_na").cast(pl.Int64),
                 pl.len().alias("n_total").cast(pl.Int64),
             ]
         )
-        .with_columns(
-            # use those count columns to calculate the NA rate and call it `na_rate`
-            (pl.col("n_na") / pl.col("n_total")).alias("na_rate").cast(pl.Float64)
-        )
-        .select(
-            # grab, from this grouped and aggregated dataframe, only columns of interest
-            ["variable", "year", "na_rate", "n_total"]
-        )
+        .with_columns((pl.col("n_na") / pl.col("n_total")).alias("na_rate").cast(pl.Float64))
+        .select(["variable", "year", "na_rate", "n_total"])
     )
