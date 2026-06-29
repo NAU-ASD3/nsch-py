@@ -34,7 +34,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     >>> df = pl.DataFrame(
     ...     {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
     ... )
-    >>> check_na_rates(df)
+    >>> check_na_rates(df).sort(["variable", "year"])
     shape: (4, 4)
     ┌──────────┬──────┬─────────┬─────────┐
     │ variable ┆ year ┆ na_rate ┆ n_total │
@@ -53,7 +53,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     if "year" not in df.columns:
         raise ValueError("Input DataFrame must contain a 'year' column")
 
-    # Leverage polars default to column operations: polars unpivot
+    # Leverage polars strength for column operations: polars unpivot
     return (
         df.unpivot(index="year", variable_name="variable", value_name="value")
         .group_by(["year", "variable"])

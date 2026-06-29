@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## [2026.6.29] - 2026-06-29
+
+- Added `check_na_rates` for checking per-variable NA rates per year (#NN)
+
 ## [2026.6.17] - 2026-06-17
 
 - Added _types module with the TaggedNA sentinel scheme (#8)
