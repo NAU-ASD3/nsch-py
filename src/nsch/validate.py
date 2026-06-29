@@ -9,10 +9,7 @@ specific years, or for applying a threshold (e.g. exclude columns with
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import polars as pl
+import polars as pl
 
 
 def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
@@ -40,4 +37,26 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     >>> check_na_rates(df)
 
     """
-    raise NotImplementedError()
+    # Leverage polars default to column operations: polars unpivot
+    # unpivot df to long format, with columns year, variable, and value
+    # group by year and variable to look at values fitting only that pair's intersection
+    return (
+        df.unpivot(index="year", variable_name="variable", value_name="value")
+        .group_by(["year", "variable"])
+        .agg(
+            [
+                # for the grouped pair value intersection, add columns with the
+                # count of the number of NA values and number of total values
+                pl.col("value").is_null().sum().alias("n_na").cast(pl.Int64),
+                pl.len().alias("n_total").cast(pl.Int64),
+            ]
+        )
+        .with_columns(
+            # use those count columns to calculate the NA rate and call it `na_rate`
+            (pl.col("n_na") / pl.col("n_total")).alias("na_rate").cast(pl.Float64)
+        )
+        .select(
+            # grab, from this grouped and aggregated dataframe, only columns of interest
+            ["variable", "year", "na_rate", "n_total"]
+        )
+    )
