@@ -2,22 +2,27 @@
 
 All notable changes to this project are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versions follow a date-based scheme: `YYYY.M.DD`.
+This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#NN)`
+section per PR, newest first. Versions follow a date-based scheme, `YYYY.M.DD`,
+bumped per PR to the date it lands. When two PRs land on the same day, the
+second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
+so each version stays unique and the date stays honest.
 
-## 2026.6.29 (PR#44)
+## 2026.6.29.1 (PR#44)
 
 - Added `check_na_rates` for checking per-variable NA rates per year
 
-## [2026.6.17] - 2026-06-17
+## 2026.6.29 (PR#46)
 
-- Added _types module with the TaggedNA sentinel scheme (#8)
+- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
 
-## [2026.5.27] — 2026-05-27
+## 2026.6.17 (PR#8)
 
-### Added
+- Added the `_types` module with the TaggedNA sentinel scheme.
 
-- Initial repository scaffolding (PR #1):
+## 2026.5.27 (PR#1)
+
+- Initial repository scaffolding:
   - `pyproject.toml` with `[project]` metadata, runtime and dev dependency groups, and configuration for ruff, mypy, pytest, and coverage.
   - GitHub Actions CI workflow with lint, matrix test (Python 3.11–3.13 on Linux; 3.13 on macOS), build, docs, and dependency-review jobs.
   - GitHub Actions release workflow triggered on `v*` tag push.
