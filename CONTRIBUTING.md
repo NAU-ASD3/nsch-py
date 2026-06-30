@@ -16,7 +16,7 @@ uv sync --group dev
 uv run pre-commit install
 ```
 
-`uv sync` installs all runtime and development dependencies into a project-local virtual environment at `.venv/`. You do not need to activate it — `uv run <command>` handles that.
+`uv sync` installs all runtime and development dependencies into a project-local virtual environment at `.venv/`. You do not need to activate it; `uv run <command>` handles that.
 
 ## Running things
 
@@ -95,14 +95,14 @@ We use a stacked-PR workflow: each PR depends only on earlier PRs in the stack, 
 
 For stacked PRs, the first line of the PR description must be:
 
-> ⚠️ Stacked PR — branches from `<parent_branch>` (#<parent_PR>). Only files listed below are new; others belong to parent PR.
+> ⚠️ Stacked PR: branches from `<parent_branch>` (#<parent_PR>). Only files listed below are new; others belong to parent PR.
 
 followed by an explicit list of new files. Check the **Files changed** tab before requesting review to confirm you aren't sending duplicated work.
 
 Every PR must include:
 
-- A version bump in `pyproject.toml`. Format: `2026.M.DD` matching today's date.
-- A matching entry in `CHANGELOG.md` under `[Unreleased]`, referencing the PR number.
+- A version bump in `pyproject.toml` to the date the PR lands, format `YYYY.M.DD`. If another PR already used today's date, append a micro segment: `YYYY.M.DD.MICRO` (e.g. the second PR in a day is `2026.6.29.1`, the third `2026.6.29.2`).
+- A matching `CHANGELOG.md` entry: a new `## YYYY.M.DD (PR#NN)` section at the top of the list, with the change as bullets. This mirrors the R package's `NEWS.md`.
 - Complete tests for any new function or behavior.
 - Complete docstrings on any new public API.
 - An update to the mkdocs nav (`mkdocs.yml`) if a new public module is added.
@@ -112,7 +112,7 @@ PR titles use the imperative mood, lowercase: `add transform_values for per-year
 
 ## Adding a dependency
 
-Runtime dependencies are reviewed carefully — each one is a maintenance cost. Before adding one:
+Runtime dependencies are reviewed carefully, because each one is a maintenance cost. Before adding one:
 
 1. Verify the functionality isn't already available in the standard library or in an existing dependency.
 2. Confirm the package is actively maintained (recent releases, open issues triaged).

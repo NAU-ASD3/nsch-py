@@ -44,15 +44,15 @@ this is just the shape of the thing.
 4. **Combine** all the years into one table.
 5. **Check** the result for obvious problems.
 
-One detail is worth flagging now because it drives a lot of the design. The
+One detail matters now, because it drives a lot of the design. The
 survey distinguishes several reasons a value can be missing. "This question did
-not apply to this child" is genuinely different from "this question applied but
+not apply to this child" is different from "this question applied but
 nobody answered it," and our analysis cares about the difference. Most tools
 throw that distinction away and turn everything into a single blank. We go out of
 our way to keep it. If you see numbers like 996, 997, 998, and 999 in the code,
 that is the scheme we use to carry those four kinds of missing through the
 pipeline. The reasoning is written up in
-[docs/design-decisions.md](design-decisions.md), which is worth reading once you
+[design decisions](design-decisions.md); read it once you
 have the basics down.
 
 ## What you will need installed
@@ -128,10 +128,9 @@ nsch-py/
 └── README.md          the project overview
 ```
 
-Most of `src/nsch/` is not written yet. The
-[migration plan](https://github.com/NAU-ASD3/nsch) describes the modules we are
-building toward (reading files, the config layer, the harmonize steps, combining
-years, the checks). Each one is, or will be, a tracked issue.
+Most of `src/nsch/` is not written yet. We are building toward the modules that
+read files, load and validate the config, run the harmonize steps, combine the
+years, and check the result. Each one is, or will be, a tracked issue.
 
 `src/nsch/_types.py` is a good first file to read. It is small, it has no moving
 parts, and the style of it (the docstring, the comments that explain the why, the
@@ -146,9 +145,8 @@ function, the workflow is:
 1. Open the R version of that function, usually `R/<name>.R`, and its test,
    usually `tests/testthat/test-<name>.R`. Read both until you understand what
    the function does and what its tests expect.
-2. Read the part of the migration plan that describes the Python version. The
-   signature sometimes changes on purpose (for example, returning a new frame
-   instead of modifying one in place).
+2. Note where the Python version is meant to differ. Some signatures change on
+   purpose, for example returning a new frame instead of modifying one in place.
 3. Write your tests first, in Python, in our style.
 4. Write the function.
 5. Run the checks and open a PR.
@@ -221,7 +219,7 @@ goes through these same steps.
 ## The conventions that matter most
 
 [CONTRIBUTING.md](https://github.com/NAU-ASD3/nsch-py/blob/main/CONTRIBUTING.md) has the full list. These are the few that
-new contributors trip on most often, so they are worth knowing up front.
+new contributors trip on most often, so they are the ones to know up front.
 
 - **Tests come first, and tests use small made-up data.** A handful of rows you
   type out by hand, not a real survey file. Compare whole columns at once
