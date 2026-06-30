@@ -5,11 +5,9 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow a date-based scheme: `YYYY.M.DD`.
 
-## [Unreleased]
+## 2026.6.25 (PR#38)
 
-## [2026.6.25] - 2026-06-25
-
-- Added `check_year_coverage` to report per-variable year coverage (#38)
+- Added `check_year_coverage` to report per-variable year coverage.
 
 ## [2026.6.17] - 2026-06-17
 
