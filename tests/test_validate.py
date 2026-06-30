@@ -41,6 +41,14 @@ def test_contains_year_column():
         check_year_coverage(df)
 
 
+def test_null_year_raises_value_error():
+    # Raises an error if the ``year`` column contains null values
+    # Safeguards against missingness from earlier in the pipeline
+    df = pl.DataFrame({"year": ["2016", None, "2017"], "x": [1, 2, 3]})
+    with pytest.raises(ValueError, match="year"):
+        check_year_coverage(df)
+
+
 def test_identifies_variable_entirely_NA_in_one_year():
     # Identifies a variable that is entirely missing in a single year.
     df = pl.DataFrame(

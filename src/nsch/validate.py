@@ -61,6 +61,8 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         raise TypeError("Input must be a polars DataFrame.")
     if "year" not in df.columns:
         raise ValueError("Input DataFrame must contain a 'year' column.")
+    if df["year"].is_null().any():
+        raise ValueError("'year' column must not contain null values")
 
     var_names = [c for c in df.columns if c != "year"]
     all_years = df["year"].unique()
