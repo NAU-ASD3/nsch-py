@@ -5,11 +5,9 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow a date-based scheme: `YYYY.M.DD`.
 
-## [Unreleased]
+## 2026.6.29 (PR#44)
 
-## [2026.6.29] - 2026-06-29
-
-- Added `check_na_rates` for checking per-variable NA rates per year (#44)
+- Added `check_na_rates` for checking per-variable NA rates per year
 
 ## [2026.6.17] - 2026-06-17
 
