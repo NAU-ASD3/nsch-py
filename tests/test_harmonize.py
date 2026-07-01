@@ -21,11 +21,12 @@ class TransformValues(TypedDict):
 # Tests:
 # Correct indices are matched for correct years
 #   (Bundle with correct year is changed)
+#   label col is created when not there and all cols are correct
+#   (bundle when checking a whole df)
 # multiple indices for values are remapped
+# Existing label cols are left alone with values filled
 # Missing years in transform is flagged
 # empty df returns empty
-# label col is created when not there and all cols are correct
-#   (bundle when checking a whole df)
 # non-matching year leaves values and labels unchanged
 # transforms with only label don't modify values but do modify labels
 # silently skips variables not in lf
@@ -43,6 +44,7 @@ def test_value_are_remapped_for_matching_year():
             {"years": ["2016", "2017"], "value": "2", "new_value": "1", "new_label": "Yes"}
         )
     }
-    result = transform_values(lf, transforms, 2016)
-    expected = pl.LazyFrame({"k2q01_d": [1, 1, 3]}, {"k2q01_d_label": [None, "Yes", None]})
+    result = transform_values(lf, transforms, 2016).collect()
+    print(f"result: {result}")
+    expected = pl.DataFrame({"k2q01_d": [1, 1, 3], "k2q01_d_label": [None, "Yes", None]})
     assert_frame_equal(result, expected)
