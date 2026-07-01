@@ -27,50 +27,57 @@ import polars as pl
 
 # Returns transformed as a new pl.LazyFrame (Because R returns invisibly)
 
+# for each label in transforms (variable name)
+# get the details (years, value, new_value, new_label)
+# if str(year) is in details' year list and the label (variable name)
+# is in the lazyframe, add "variable name_label" to the lf label column
+# if it already exists. If not, check and add
+# Get old and new values as numerics into their own variables
+# match up where, in the lf at the variable, the old values are
+# if there are matches, set the value at the matched index (i) at variable
+# name (j) to the new value at the corresponding index
+# also set value at matched index (i) in label column (j) to the new label
+# set is like a mutate+filter done on r invisible() frame functions (lazy version)
+
 
 def transform_values(
     lf: pl.LazyFrame, transforms: dict[str, dict[str, str]], year: int
 ) -> pl.LazyFrame:
-    # for each label in transforms (variable name)
-    # get the details (years, value, new_value, new_label)
-    # if str(year) is in details' year list and the label (variable name)
-    # is in the lazyframe, add "variable name_label" to the lf label column
-    # if it already exists. If not, check and add
-    # Get old and new values as numerics into their own variables
-    # match up where, in the lf at the variable, the old values are
-    # if there are matches, set the value at the matched index (i) at variable
-    # name (j) to the new value at the corresponding index
-    # also set value at matched index (i) in label column (j) to the new label
-    # set is like a mutate+filter done on r invisible() frame functions (lazy version)
-
-    # Alter to vectors for polars style, create a map and use .replace()
     transformed_lf = lf  # Is this valid for the idea of not mutating in place?
-    # Useful for leaving unchanged columns
-    # Get lf column names (variable names)
-    variable_names = lf.collect_schema().names()
-    # loop through transform keys and grab inner dicts
+    schema = transformed_lf.collect_schema()
+    variable_names = schema.names()
+
     for transform_variable_name in transforms:
         # if label in lf names and year in dict's year list
         details = transforms[transform_variable_name]
         transform_years = list(details["years"])
         if (transform_variable_name in variable_names) & (str(year) in transform_years):
             # access dictionary at that label
-            # create map of old values to new values
-            value_map = {details["value"]: details["new_value"]}
-            label_map = {details["value"]: details["new_label"]}
-            print(label_map)
-            label_col = str(transform_variable_name) + "_label"
-            if (label_col) not in variable_names:
-                transformed_lf = transformed_lf.with_columns(
-                    pl.lit(None, dtype=pl.Utf8).alias(label_col)
-                )
-                # Add new label column to be found in variable_names for next iteration
-                variable_names.append(label_col)
-            # Modify label column or (Later test) add then modify
-            # modify whole column as a vector using the remap and add to return lf
-            transformed_lf = transformed_lf.with_columns(
-                pl.col(label_col).replace(label_map).alias(label_col),
-                pl.col(transform_variable_name).replace(value_map).alias(transform_variable_name),
+            # create condition to map matching values
+            # true if the column value matches the old value in the transforms map
+            # and makes sure mapped values and column are of the same type
+            column_dtype = schema[transform_variable_name]
+            condition = pl.col(transform_variable_name) == pl.lit(details["value"]).cast(
+                column_dtype
             )
-        # else, leave column unchanged in return lf
+            label_col = str(transform_variable_name) + "_label"
+            # Create new columns with the remapped values and labels, using when/then/otherwise
+            value_transform = (
+                pl.when(condition)
+                .then(pl.lit(details["new_value"]).cast(column_dtype))
+                .otherwise(pl.col(transform_variable_name))
+                .alias(transform_variable_name)
+            )
+            label_transform = (
+                pl.when(condition)
+                .then(pl.lit(details["new_label"]))
+                .otherwise(
+                    pl.col(label_col)
+                    if label_col in variable_names
+                    else pl.lit(None, dtype=pl.Utf8)
+                )
+                .alias(label_col)
+            )
+            # modify whole column as a vector using the remap and add to return lf
+            transformed_lf = transformed_lf.with_columns([value_transform, label_transform])
     return transformed_lf
