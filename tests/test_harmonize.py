@@ -2,34 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
-
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from nsch.harmonize import transform_values
-
-
-class TransformValues(TypedDict):
-    years: list[str]
-    value: list[str]
-    new_value: list[str]
-    new_label: list[str]
-
-
-# -------------------------
-# Tests:
-# empty df returns empty
-# -------------------------
-
-################
-# QUESTIONS
-# NA_character_ in R expected df = None? What kind of NA? Does polars have typed NAs?
-# PR note: Only works when transforms have same lenghth for value, new_value, and new_label
-# PR note: Does not check for transforming mixed data, done on the lazy frame when
-# enums are still ints. Relies on Json so presence of years in transform is not checked
-# PR note: Empty test necessary?
-# PR note: Order of output columns matter?
+from nsch.harmonize import TransformValues, transform_values
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -89,7 +65,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
 
 
 def test_label_only_transforms_work():
-    lf = pl.LazyFrame({"sex": [1, 2]})
+    lf = pl.LazyFrame({"sex": [1, 2, 1]})
     transforms = {
         "sex": TransformValues(
             {
@@ -101,7 +77,7 @@ def test_label_only_transforms_work():
         )
     }
     result = transform_values(lf, transforms, 2017).collect()
-    expected = pl.DataFrame({"sex": [1, 2], "sex_label": ["Male", "Female"]})
+    expected = pl.DataFrame({"sex": [1, 2, 1], "sex_label": ["Male", "Female", "Male"]})
     assert_frame_equal(result, expected)
 
 

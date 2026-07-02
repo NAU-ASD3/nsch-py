@@ -11,39 +11,74 @@ text for remapped rows.
 
 Silently skips variables not present in the input ``pl.LazyFrame``
 
-
-
-
-
 """
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 import polars as pl
 
-# Transforms are a named list of lists, treating name and inner lists as keys
-# R treats everything, including years and numeric values, as strings
-# likely a nested dictionary of strings
+__all__ = ["TransformValues", "transform_values"]
 
-# Returns transformed as a new pl.LazyFrame (Because R returns invisibly)
 
-# for each label in transforms (variable name)
-# get the details (years, value, new_value, new_label)
-# if str(year) is in details' year list and the label (variable name)
-# is in the lazyframe, add "variable name_label" to the lf label column
-# if it already exists. If not, check and add
-# Get old and new values as numerics into their own variables
-# match up where, in the lf at the variable, the old values are
-# if there are matches, set the value at the matched index (i) at variable
-# name (j) to the new value at the corresponding index
-# also set value at matched index (i) in label column (j) to the new label
-# set is like a mutate+filter done on r invisible() frame functions (lazy version)
+class TransformValues(TypedDict):
+    years: list[str]
+    value: list[str]
+    new_value: list[str]
+    new_label: list[str]
 
 
 def transform_values(
-    lf: pl.LazyFrame, transforms: dict[str, dict[str, str]], year: int
+    lf: pl.LazyFrame, transforms: dict[str, TransformValues], year: int
 ) -> pl.LazyFrame:
-    transformed_lf = lf  # Is this valid for the idea of not mutating in place?
+    """Apply value and label remapping rules to transform a single year's raw numeric pl.LazyFrame.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        One year's data before transforming.
+    transforms : dict[str, TransformValues]
+        Maps a source column name to its transform. A transform only applies when ``year``
+        is in the transform's ``years``.
+    year : int
+        The survey year held by ``lf``. Compared against each transform's ``years``,
+        which the config stores as strings.
+
+    Returns
+    -------
+    pl.LazyFrame
+        The frame with matching columns transformed and each column's ``_label``
+        companion added or updated. Columns with no applicable transform, or not
+        present in ``transforms``, are left alone.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame({"sex": [1, 2, 1]})
+    >>> transforms = {
+    ...     "sex": TransformValues(
+    ...         {
+    ...             "years": ["2016"],
+    ...             "value": ["1", "2"],
+    ...             "new_value": ["1", "2"],
+    ...             "new_label": ["Male", "Female"],
+    ...         }
+    ...     )
+    ... }
+    >>> transform_values(lf, transforms, 2016).collect()
+    shape: (3, 2)
+    ┌─────┬───────────┐
+    │ sex ┆ sex_label │
+    │ --- ┆ ---       │
+    │ i64 ┆ str       │
+    ╞═════╪═══════════╡
+    │ 1   ┆ Male      │
+    │ 2   ┆ Female    │
+    │ 1   ┆ Male      │
+    └─────┴───────────┘
+    """
+    transformed_lf = lf
     schema = transformed_lf.collect_schema()
     # Use a set for faster looping
     variable_names = set(schema.names())
@@ -51,15 +86,13 @@ def transform_values(
     for transform_variable_name, details in transforms.items():
         transform_years = details["years"]
         if (transform_variable_name in variable_names) & (str(year) in transform_years):
-            # Get colum datatype for casting back after transforming values
+            # Get colum datatype for casting back after casting to string to transform values
             column_dtype = schema[transform_variable_name]
             label_col = str(transform_variable_name) + "_label"
 
-            # transform column to strings for comparison with string lists in transforms
             column_as_string = pl.col(transform_variable_name).cast(pl.Utf8)
             condition = column_as_string.is_in(details["value"])
 
-            # Create new columns with the remapped values and labels, using when/then/otherwise
             value_transform = (
                 pl.when(condition)
                 .then(
@@ -80,10 +113,8 @@ def transform_values(
                 )
                 .alias(label_col)
             )
-            # if label column is not in variable_names, update list
             if label_col not in variable_names:
-                # Variable_names is a set
+                # Variable_names is a set, use .add instead of .append
                 variable_names.add(label_col)
-            # modify whole column as a vector using the remap and add to return lf
             transformed_lf = transformed_lf.with_columns([value_transform, label_transform])
     return transformed_lf
