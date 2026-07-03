@@ -1,6 +1,6 @@
 [project]
 name = "nsch"
-version = "2026.6.29"
+version = "2026.7.3"
 description = "NSCH data preparation toolkit: download, harmonize, and combine National Survey of Children's Health data across years."
 readme = "README.md"
 requires-python = ">=3.11"

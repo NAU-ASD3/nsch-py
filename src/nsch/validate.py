@@ -1,0 +1,105 @@
+"""Per-variable year coverage for the validate module
+
+``check_year_coverage`` checks that each column (excluding `year`) has
+at least one non-missing value in each year present in the data. It accepts
+a `pl.DataFrame` and returns a `pl.DataFrame` with a per-column summary of the
+total number of years, total number of years with data,
+and a list of years which are entirely missing for that column.
+It gives a snapshot of missingness in variables across survey years.
+"""
+
+from __future__ import annotations
+
+import polars as pl
+
+
+def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
+    """Report per-variable year coverage across the combined data.
+
+
+    Parameters
+    ----------
+    df: pl.DataFrame
+        A DataFrame with a ``year`` column and one or more other columns
+        with data collected across multiple years.
+
+    Returns
+    -------
+    pl.DataFrame
+        A per-column summary containing the total number of years, the number
+        of years with data, and a list of years for which all values are missing.
+
+    Notes
+    -----
+    Empty results
+        When the input contains no rows, the function still returns a Polars DataFrame
+        with the canonical four columns and their declared dtypes.
+        This is intentional: callers can always do ``df["col"]`` or check
+        ``df.is_empty()`` without first guarding against a missing column.
+        Contrast with R's ``rbindlist(list())`` which returns a 0x0 frame.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> from nsch.validate import check_year_coverage
+    >>> df = pl.DataFrame(
+    ...     {"year": ["2016", "2016", "2017", "2017"], "x": [1, 2, 3, 4], "y": [1, 2, None, None]}
+    ... )
+    >>> check_year_coverage(df)
+    shape: (2, 4)
+    ┌──────────┬──────────────┬───────────────┬───────────────┐
+    │ variable ┆ n_years_data ┆ n_years_total ┆ missing_years │
+    │ ---      ┆ ---          ┆ ---           ┆ ---           │
+    │ str      ┆ i64          ┆ i64           ┆ str           │
+    ╞══════════╪══════════════╪═══════════════╪═══════════════╡
+    │ x        ┆ 2            ┆ 2             ┆               │
+    │ y        ┆ 1            ┆ 2             ┆ 2017          │
+    └──────────┴──────────────┴───────────────┴───────────────┘
+    """
+    # make sure input df is a polars DataFrame and contains a year column
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Input must be a polars DataFrame.")
+    if "year" not in df.columns:
+        raise ValueError("Input DataFrame must contain a 'year' column.")
+    if df["year"].is_null().any():
+        raise ValueError("'year' column must not contain null values")
+
+    var_names = [c for c in df.columns if c != "year"]
+    all_years = df["year"].unique()
+    n_years_total = len(all_years)
+
+    variables: list[str] = []
+    n_years_data: list[int] = []
+    n_years_total_list: list[int] = []
+    # years are treated as strings for concatenation in the missing_years column
+    missing_years: list[str] = []
+
+    for col in var_names:
+        # Get the total number of years with non-NA values for this variable
+        year_counts = df.group_by("year").agg(pl.col(col).is_not_null().sum().alias("n_non_na"))
+        years_with_data = year_counts.filter(pl.col("n_non_na") > 0)["year"]
+        # python will only take the difference of two sets,
+        # so the series from .unique() needs conversion first
+        years_missing = list(set(all_years) - set(years_with_data))
+
+        variables.append(col)
+        n_years_data.append(years_with_data.len())
+        n_years_total_list.append(n_years_total)
+        # Turn the list of missing years into a comma-separated string
+        missing_years.append(",".join(str(y) for y in sorted(years_missing)))
+
+    # An empty dataframe returns a typed empty dataframe unlike R's 0x0 return frame
+    return pl.DataFrame(
+        {
+            "variable": variables,
+            "n_years_data": n_years_data,
+            "n_years_total": n_years_total_list,
+            "missing_years": missing_years,
+        },
+        schema={
+            "variable": pl.Utf8,
+            "n_years_data": pl.Int64,
+            "n_years_total": pl.Int64,
+            "missing_years": pl.Utf8,
+        },
+    )
