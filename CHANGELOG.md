@@ -8,13 +8,13 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.3 (PR#38)
+
+- Added `check_year_coverage` to report per-variable year coverage.
+
 ## 2026.6.29 (PR#46)
 
 - Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
-
-## 2026.6.25 (PR#38)
-
-- Added `check_year_coverage` to report per-variable year coverage.
 
 ## 2026.6.17 (PR#8)
 
