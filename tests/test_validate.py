@@ -33,16 +33,10 @@ def test_computes_correct_NA_rates_per_year():
 
 
 def test_computes_correct_NA_rates_per_year_on_mixed_data():
-    class LETTERS(pl.Enum):
-        a = "a"
-        b = "b"
-        c = "c"
-        d = "d"
-
     df = pl.DataFrame(
         {
             "year": [2016, 2016, 2017, 2017],
-            "x": [LETTERS.a, None, LETTERS.c, LETTERS.d],
+            "x": pl.Series(["a", None, "c", "d"], dtype=pl.Enum(["a", "b", "c", "d"])),
             "y": [None, None, 5, 6],
         }
     )
