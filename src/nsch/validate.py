@@ -1,10 +1,4 @@
-"""Per-column NA rates per year for the validate module
-
-``check_na_rates`` calculates the proportion of missing values for each
-column, broken down by year. Useful for identifying variables with high
-missingness in specific years, or for applying a threshold (e.g. exclude
-columns with >10% missing) before downstream analysis.
-"""
+"""Validation checks for the combined NSCH data."""
 
 from __future__ import annotations
 
@@ -12,7 +6,12 @@ import polars as pl
 
 
 def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
-    """Calculate per-column NA rates by year.
+    """Calculate Per-column NA rates by year.
+
+    calculates the proportion of missing values for each column, broken down by
+    year. Useful for identifying variables with high missingness in specific
+    years, or for applying a threshold (e.g. exclude columns with >10% missing)
+    before downstream analysis.
 
     Parameters
     ----------
@@ -23,7 +22,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     -------
     pl.DataFrame
         A DataFrame with the columns ``variable`` (str), ``year`` (int),
-        ``na_rate`` (float between0 and 1), and ``n_total``. ``na_rate``
+        ``na_rate`` (float between 0 and 1), and ``n_total``. ``na_rate``
         is the proportion of NA values for each variable per year and
         ``n_total`` is the total number of rows for that year.
 
