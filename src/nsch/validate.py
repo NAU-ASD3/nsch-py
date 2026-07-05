@@ -17,7 +17,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     ----------
     df : pl.DataFrame
         A Polars DataFrame containing a ``year`` column
-    
+
     Returns
     -------
     pl.DataFrame
@@ -25,7 +25,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
         ``na_rate`` (float between 0 and 1), and ``n_total``. ``na_rate``
         is the proportion of NA values for each variable per year and
         ``n_total`` is the total number of rows for that year.
-   
+
     Examples
     --------
     >>> import polars as pl
@@ -66,14 +66,16 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
         .with_columns((pl.col("n_na") / pl.col("n_total")).alias("na_rate"))
         .select(["variable", "year", "na_rate", "n_total"])
         .sort(by=["variable", "year"])
-    
+    )
+
+
 def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     """Report per-variable year coverage across the combined data.
-    
+
     Checks that each column (excluding `year`) has at least one non-missing value
     in each year present in the data. It accepts a `pl.DataFrame` and returns a
     ``pl.DataFrame`` with a per-column summary of the total number of years, total
-    number of years with data,and a list of years which are entirely missing for 
+    number of years with data,and a list of years which are entirely missing for
     that column. It gives a snapshot of missingness in variables across survey years.
 
     Parameters
@@ -94,9 +96,9 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         When the input contains no rows, the function still returns a Polars DataFrame
         with the canonical four columns and their declared dtypes. This is intentional:
         callers can always do ``df["col"]`` or check ``df.is_empty()`` without first
-        guarding against a missing column. This deviates from the R versions's 
+        guarding against a missing column. This deviates from the R versions's
         ``rbindlist(list())`` which returns a 0x0 frame.
-    
+
     Examples
     --------
     >>> import polars as pl
@@ -114,7 +116,7 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     │ x        ┆ 2            ┆ 2             ┆               │
     │ y        ┆ 1            ┆ 2             ┆ 2017          │
     └──────────┴──────────────┴───────────────┴───────────────┘
-    """  
+    """
     # make sure input df is a polars DataFrame and contains a year column
     if not isinstance(df, pl.DataFrame):
         raise TypeError("Input must be a polars DataFrame.")

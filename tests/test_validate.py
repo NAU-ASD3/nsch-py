@@ -8,9 +8,10 @@ from polars.testing import assert_frame_equal
 
 from nsch.validate import check_na_rates, check_year_coverage
 
-
 """Testing For ``check_na_rates``
 """
+
+
 def test_computes_correct_NA_rates_per_year():
     df = pl.DataFrame(
         {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
@@ -82,9 +83,10 @@ def test_returns_typed_empty_dataframe_when_no_variables():
             "na_rate": pl.Float64,
             "n_total": pl.Int64,
         },
+    )
     assert_frame_equal(result, expected)
-      
-      
+
+
 def test_non_polars_dataframe_raises_type_error():
     df_check_na = {"year": [2016, 2017], "x": [1, 2]}
     df_check_coverage = {"year": ["2016", "2016"], "x": [1, 2]}
@@ -92,15 +94,16 @@ def test_non_polars_dataframe_raises_type_error():
         check_na_rates(df_check_na)
         check_year_coverage(df_check_coverage)
 
-      
+
 def test_missing_year_column_raises_value_error():
     df = pl.DataFrame({"x": [1, 2]})
     with pytest.raises(ValueError, match="year"):
         check_na_rates(df)
 
-      
-"""Testing For ``check_year_coverage``
-"""
+
+"""Testing For ``check_year_coverage``"""
+
+
 def test_correct_output_format_and_missing_years():
     # Checks the output format (column names and DataFrame type).
     # Flags variables that are entirely missing for one or more years.
@@ -183,8 +186,3 @@ def test_dataframe_with_empty_variable_column_returns_zero_values():
         }
     )
     assert_frame_equal(result, expected)
-
-
-
-
-
