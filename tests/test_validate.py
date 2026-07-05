@@ -5,7 +5,7 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
-from nsch.validate import check_factor_levels, check_year_coverage
+from nsch.validate import check_label_consistency, check_year_coverage
 
 # --- check_year_coverage ----------------------------------------------------
 
@@ -48,58 +48,57 @@ def test_empty_frame_returns_empty_summary() -> None:
     assert result.schema["n_years_data"] == pl.Int64
 
 
-# --- check_factor_levels ----------------------------------------------------
+# --- check_label_consistency ------------------------------------------------
 
 
-def test_detects_level_present_in_only_some_years() -> None:
+def test_detects_inconsistent_levels_across_years() -> None:
     df = pl.DataFrame(
         {
             "year": [2016, 2016, 2017, 2017],
-            "status": pl.Series(["A", "B", "A", "A"], dtype=pl.Enum(["A", "B"])),
+            "status": pl.Series(["A", "B", "A", "C"], dtype=pl.Enum(["A", "B", "C"])),
         }
     )
-    result = check_factor_levels(df)
-    assert result.columns == ["variable", "level", "count", "n_years_present", "years_present"]
-    b_row = result.filter((pl.col("variable") == "status") & (pl.col("level") == "B"))
-    assert b_row.height == 1
-    assert b_row["n_years_present"].to_list() == [1]
-    assert b_row["years_present"].to_list() == ["2016"]
+    result = check_label_consistency(df)
+    assert result.columns == ["variable", "is_consistent", "n_level_sets", "levels_by_year"]
+    status_row = result.filter(pl.col("variable") == "status")
+    assert status_row["is_consistent"].to_list() == [False]
+    assert status_row["n_level_sets"].to_list() == [2]
+    assert status_row["levels_by_year"].to_list() == ["2016={A|B}; 2017={A|C}"]
 
 
-def test_reports_a_level_present_in_every_year() -> None:
+def test_consistent_levels_across_years_returns_true() -> None:
     df = pl.DataFrame(
         {
             "year": [2016, 2016, 2017, 2017],
             "status": pl.Series(["A", "B", "A", "B"], dtype=pl.Enum(["A", "B"])),
         }
     )
-    result = check_factor_levels(df)
-    a_row = result.filter((pl.col("variable") == "status") & (pl.col("level") == "A"))
-    assert a_row["n_years_present"].to_list() == [2]
-    assert a_row["years_present"].to_list() == ["2016,2017"]
+    result = check_label_consistency(df)
+    status_row = result.filter(pl.col("variable") == "status")
+    assert status_row["is_consistent"].to_list() == [True]
+    assert status_row["n_level_sets"].to_list() == [1]
 
 
-def test_handles_multiple_enum_columns() -> None:
+def test_skips_non_enum_columns() -> None:
     df = pl.DataFrame(
         {
             "year": [2016, 2017],
-            "status": pl.Series(["A", "B"], dtype=pl.Enum(["A", "B"])),
-            "grade": pl.Series(["X", "Y"], dtype=pl.Enum(["X", "Y"])),
+            "x": [1.0, 2.0],
+            "status": pl.Series(["A", "A"], dtype=pl.Enum(["A"])),
         }
     )
-    result = check_factor_levels(df)
-    assert set(result["variable"].to_list()) == {"status", "grade"}
-    assert result.height == 4  # two levels in each of two columns
+    result = check_label_consistency(df)
+    assert result["variable"].to_list() == ["status"]
 
 
-def test_returns_empty_for_input_with_no_enum_columns() -> None:
-    df = pl.DataFrame({"year": [2016, 2017], "age": [5, 6], "score": [10, 20]})
-    result = check_factor_levels(df)
-    assert result.columns == ["variable", "level", "count", "n_years_present", "years_present"]
+def test_returns_empty_when_no_enum_columns_present() -> None:
+    df = pl.DataFrame({"year": [2016, 2017], "x": [1, 2]})
+    result = check_label_consistency(df)
+    assert result.columns == ["variable", "is_consistent", "n_level_sets", "levels_by_year"]
     assert result.height == 0
 
 
-def test_factor_levels_errors_without_year_column() -> None:
+def test_label_consistency_errors_without_year_column() -> None:
     df = pl.DataFrame({"status": pl.Series(["A", "B"], dtype=pl.Enum(["A", "B"]))})
     with pytest.raises(ValueError, match="year"):
-        check_factor_levels(df)
+        check_label_consistency(df)

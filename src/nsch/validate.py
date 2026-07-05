@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import polars as pl
 
-__all__ = ["check_factor_levels", "check_year_coverage"]
+__all__ = ["check_label_consistency", "check_year_coverage"]
 
 
 def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
@@ -87,13 +87,13 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def check_factor_levels(df: pl.DataFrame) -> pl.DataFrame:
-    """Summarize the levels present in each Enum column.
+def check_label_consistency(df: pl.DataFrame) -> pl.DataFrame:
+    """Report whether each Enum column's levels stay the same across years.
 
-    For every Enum column (the Polars stand-in for R's factors), report each
-    level that appears in the data: how many rows carry it, how many survey
-    years it shows up in, and which years those are. Non-Enum columns are
-    ignored.
+    For every Enum column (the Polars stand-in for R's factors), look at the
+    set of levels observed in each survey year and check whether that set is
+    identical from year to year. A column whose categories drift between years
+    is a sign that something went wrong during harmonization.
 
     Parameters
     ----------
@@ -104,13 +104,13 @@ def check_factor_levels(df: pl.DataFrame) -> pl.DataFrame:
     Returns
     -------
     pl.DataFrame
-        One row per (variable, level) pair, with columns:
+        One row per Enum column, with columns:
 
-        - ``variable``: the Enum column's name.
-        - ``level``: the level value.
-        - ``count``: number of rows carrying that level.
-        - ``n_years_present``: number of distinct years the level appears in.
-        - ``years_present``: comma-joined years the level appears in.
+        - ``variable``: the column's name.
+        - ``is_consistent``: ``True`` if the level set is identical in every
+          year.
+        - ``n_level_sets``: how many distinct level sets appear across years.
+        - ``levels_by_year``: a per-year summary like ``2016={A|B}; 2017={A|C}``.
 
         Zero rows if the table has no Enum columns.
 
@@ -124,12 +124,12 @@ def check_factor_levels(df: pl.DataFrame) -> pl.DataFrame:
     >>> import polars as pl
     >>> df = pl.DataFrame(
     ...     {
-    ...         "year": [2016, 2016, 2017],
-    ...         "status": pl.Series(["A", "B", "A"], dtype=pl.Enum(["A", "B"])),
+    ...         "year": [2016, 2016, 2017, 2017],
+    ...         "status": pl.Series(["A", "B", "A", "C"], dtype=pl.Enum(["A", "B", "C"])),
     ...     }
     ... )
-    >>> check_factor_levels(df).columns
-    ['variable', 'level', 'count', 'n_years_present', 'years_present']
+    >>> check_label_consistency(df).columns
+    ['variable', 'is_consistent', 'n_level_sets', 'levels_by_year']
     """
     if "year" not in df.columns:
         raise ValueError("Input data must contain a 'year' column")
@@ -137,32 +137,50 @@ def check_factor_levels(df: pl.DataFrame) -> pl.DataFrame:
     # Compare the dtype object against pl.Enum. A string test like
     # str(dtype) == "Enum" is fragile: the text carries the categories too.
     enum_cols = [name for name, dtype in df.schema.items() if dtype == pl.Enum]
+    all_years = sorted(df["year"].unique().to_list())
 
-    # An explicit empty frame fixes the column order and dtypes for the
-    # no-Enum-column case, and anchors the concat below.
-    empty = pl.DataFrame(
-        schema={
+    variables: list[str] = []
+    is_consistent: list[bool] = []
+    n_level_sets: list[int] = []
+    levels_by_year: list[str] = []
+
+    for col in enum_cols:
+        level_sets: list[str] = []
+        year_labels: list[str] = []
+        for year in all_years:
+            # The levels actually observed that year, not the Enum's full
+            # category list: drop nulls, dedupe, sort, join with "|".
+            observed = (
+                df.filter(pl.col("year") == year)[col]
+                .drop_nulls()
+                .cast(pl.String)
+                .unique()
+                .sort()
+                .to_list()
+            )
+            key = "|".join(observed)
+            level_sets.append(key)
+            year_labels.append(f"{year}={{{key}}}")
+
+        distinct_sets = set(level_sets)
+        variables.append(col)
+        is_consistent.append(len(distinct_sets) <= 1)
+        n_level_sets.append(len(distinct_sets))
+        levels_by_year.append("; ".join(year_labels))
+
+    # schema_overrides fixes the dtypes so the no-Enum (empty) case still
+    # returns the right columns instead of Polars inferring Null from [].
+    return pl.DataFrame(
+        {
+            "variable": variables,
+            "is_consistent": is_consistent,
+            "n_level_sets": n_level_sets,
+            "levels_by_year": levels_by_year,
+        },
+        schema_overrides={
             "variable": pl.String,
-            "level": pl.String,
-            "count": pl.Int64,
-            "n_years_present": pl.Int64,
-            "years_present": pl.String,
-        }
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.String,
+        },
     )
-
-    summaries = [
-        df.select(pl.col("year"), pl.col(col).cast(pl.String).alias("level"))
-        .drop_nulls("level")
-        .group_by("level")
-        .agg(
-            pl.len().cast(pl.Int64).alias("count"),
-            pl.col("year").n_unique().cast(pl.Int64).alias("n_years_present"),
-            # Sort years before joining so "2016,2017" reads in order.
-            pl.col("year").unique().sort().cast(pl.String).str.join(",").alias("years_present"),
-        )
-        .with_columns(variable=pl.lit(col))
-        .select("variable", "level", "count", "n_years_present", "years_present")
-        for col in enum_cols
-    ]
-
-    return pl.concat([*summaries, empty])
