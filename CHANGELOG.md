@@ -12,6 +12,10 @@ so each version stays unique and the date stays honest.
 
 - Added `check_na_rates` for checking per-variable NA rates per year
 
+## 2026.7.3 (PR#38)
+
+- Added `check_year_coverage` to report per-variable year coverage.
+
 ## 2026.6.29 (PR#46)
 
 - Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
