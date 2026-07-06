@@ -17,8 +17,10 @@ def test_value_is_remapped_for_matching_year_and_label_column_is_created():
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["1"], "new_label": ["Yes"]}
         )
     }
-    result = transform_values(lf, transforms, 2016).collect()
-    expected = pl.DataFrame({"k2q01_d": [1.0, 1.0, 3.0], "k2q01_d_label": [None, "Yes", None]})
+    result = transform_values(lf, transforms, 2016).collect().sort("k2q01_d")
+    expected = pl.DataFrame(
+        {"k2q01_d": [1.0, 1.0, 3.0], "k2q01_d_label": [None, "Yes", None]}
+    ).sort("k2q01_d")
     assert_frame_equal(result, expected)
 
 
@@ -54,7 +56,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
             },
         ),
     }
-    result = transform_values(lf, transforms, 2016).collect()
+    result = transform_values(lf, transforms, 2016).collect().sort("family")
     expected = pl.DataFrame(
         {
             "family": [1, 1, 2, 2],
@@ -62,7 +64,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
             "family_label": ["Two Parents", "Two Parents", "Other", "Other"],
             "hoursleep_label": ["7 hours", "7 hours", "8 hours", "8 hours"],
         }
-    )
+    ).sort("family")
     assert_frame_equal(result, expected)
 
 
@@ -78,8 +80,8 @@ def test_label_only_transforms_work():
             }
         )
     }
-    result = transform_values(lf, transforms, 2017).collect()
-    expected = pl.DataFrame({"sex": [1, 2, 1], "sex_label": ["Male", "Female", "Male"]})
+    result = transform_values(lf, transforms, 2017).collect().sort("sex")
+    expected = pl.DataFrame({"sex": [1, 2, 1], "sex_label": ["Male", "Female", "Male"]}).sort("sex")
     assert_frame_equal(result, expected)
 
 
@@ -90,6 +92,7 @@ def test_missing_variable_in_lf_is_silently_skipped():
             {"years": ["2017"], "value": ["1"], "new_value": ["2"], "new_label": ["Two"]}
         )
     }
+    # If warnings are raised, treat as errors
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         result = transform_values(lf, transforms, 2017).collect()
@@ -103,8 +106,10 @@ def test_existing_label_cols_are_updated_with_values_filled():
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["2"], "new_label": ["Yes"]}
         )
     }
-    result = transform_values(lf, transforms, 2016).collect()
-    expected = pl.DataFrame({"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["Yes", "Yes", None]})
+    result = transform_values(lf, transforms, 2016).collect().sort("k2q01_d")
+    expected = pl.DataFrame(
+        {"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["Yes", "Yes", None]}
+    ).sort("k2q01_d")
     assert_frame_equal(result, expected)
 
 
