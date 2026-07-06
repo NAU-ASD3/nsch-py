@@ -1,15 +1,12 @@
 """Remap answer codes per year for harmonize module
 
 ``transform_values`` applies value and label remapping rules to a single year's
-raw numeric ``pl.LazyFrame``, modifying it by reference. For each variable in
-``transforms`` whose ``years`` vector includes ``chr(year)` it iterates over
-the paired ``value``/ ``new_value``/``new_label`` entries and replaces each
-matching numeric value with its new value.
-
-Creates or updates the corresponding ``_label`` column with the ``new_label``
-text for remapped rows.
-
-Silently skips variables not present in the input ``pl.LazyFrame``
+raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
+transformed. For each variable in ``transforms`` whose ``years`` vector includes
+``chr(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
+entries and replaces each matching numeric value with its new value. It creates
+or updates the corresponding ``_label`` column with the ``new_label`` text for
+remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
 
 """
 
@@ -80,41 +77,42 @@ def transform_values(
     """
     transformed_lf = lf
     schema = transformed_lf.collect_schema()
-    # Use a set for faster looping
     variable_names = set(schema.names())
 
     for transform_variable_name, details in transforms.items():
         transform_years = details["years"]
-        if (transform_variable_name in variable_names) & (str(year) in transform_years):
-            # Get colum datatype for casting back after casting to string to transform values
+        if (transform_variable_name in variable_names) and (str(year) in transform_years):
+            # Get column datatype for converting transform's string values
             column_dtype = schema[transform_variable_name]
             label_col = str(transform_variable_name) + "_label"
 
-            column_as_string = pl.col(transform_variable_name).cast(pl.Utf8)
-            condition = column_as_string.is_in(details["value"])
-
-            value_transform = (
-                pl.when(condition)
-                .then(
-                    column_as_string.replace(old=details["value"], new=details["new_value"]).cast(
-                        column_dtype
-                    )
-                )
-                .otherwise(pl.col(transform_variable_name))
-                .alias(transform_variable_name)
-            )
-            label_transform = (
-                pl.when(condition)
-                .then(column_as_string.replace(old=details["value"], new=details["new_label"]))
-                .otherwise(
-                    pl.col(label_col)
-                    if label_col in variable_names
-                    else pl.lit(None, dtype=pl.Utf8)
-                )
-                .alias(label_col)
-            )
             if label_col not in variable_names:
+                transformed_lf = transformed_lf.with_columns(
+                    pl.lit(None, dtype=pl.Utf8).alias(label_col)
+                )
                 # Variable_names is a set, use .add instead of .append
                 variable_names.add(label_col)
-            transformed_lf = transformed_lf.with_columns([value_transform, label_transform])
+
+            # Create a mapping bewtween values and new values/labels for the transform
+            lookup = pl.DataFrame(
+                {
+                    transform_variable_name: pl.Series(details["value"]).cast(column_dtype),
+                    "_new_value": pl.Series(details["new_value"]).cast(column_dtype),
+                    "_new_label": details["new_label"],
+                }
+            ).lazy()
+
+            transformed_lf = (
+                transformed_lf.join(lookup, on=transform_variable_name, how="left")
+                .with_columns(
+                    [
+                        pl.coalesce(["_new_value", pl.col(transform_variable_name)]).alias(
+                            transform_variable_name
+                        ),
+                        pl.coalesce(["_new_label", pl.col(label_col)]).alias(label_col),
+                    ]
+                )
+                .drop("_new_value", "_new_label")
+            )
+
     return transformed_lf
