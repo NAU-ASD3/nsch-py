@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import polars as pl
 from polars.testing import assert_frame_equal
 
@@ -88,13 +90,14 @@ def test_missing_variable_in_lf_is_silently_skipped():
             {"years": ["2017"], "value": ["1"], "new_value": ["2"], "new_label": ["Two"]}
         )
     }
-    result = transform_values(lf, transforms, 2017).collect()
-    assert_frame_equal(result, pl.DataFrame({"x": [1, 2]}))
-    # How to test that no warning or error is raised?
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = transform_values(lf, transforms, 2017).collect()
+        assert_frame_equal(result, pl.DataFrame({"x": [1, 2]}))
 
 
 def test_existing_label_cols_are_updated_with_values_filled():
-    lf = pl.LazyFrame({"k2q01_d": [2, 2, 3], "k2q01_d_label": ["No", None, None]})
+    lf = pl.LazyFrame({"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["No", None, None]})
     transforms = {
         "k2q01_d": TransformValues(
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["2"], "new_label": ["Yes"]}
@@ -114,3 +117,15 @@ def test_empty_input_returns_empty():
     }
     result = transform_values(lf, transforms, 2017)
     assert_frame_equal(lf.collect(), result.collect())
+
+
+def test_matching_year_but_no_matching_values_creates_null_label_column():
+    lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
+    transforms = {
+        "k2q01_d": TransformValues(
+            {"years": ["2017"], "value": ["4"], "new_value": ["5"], "new_label": ["Yes"]}
+        )
+    }
+    result = transform_values(lf, transforms, 2017).collect()
+    expected = pl.DataFrame({"k2q01_d": [1, 2, 3], "k2q01_d_label": [None, None, None]})
+    assert_frame_equal(result, expected)
