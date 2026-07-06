@@ -3,7 +3,7 @@
 ``transform_values`` applies value and label remapping rules to a single year's
 raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
 transformed. For each variable in ``transforms`` whose ``years`` vector includes
-``chr(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
+``str(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
 entries and replaces each matching numeric value with its new value. It creates
 or updates the corresponding ``_label`` column with the ``new_label`` text for
 remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
