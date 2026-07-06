@@ -11,14 +11,14 @@ from nsch.harmonize import TransformValues, transform_values
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
-    lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
+    lf = pl.LazyFrame({"k2q01_d": [1.0, 2.0, 3.0]})
     transforms = {
         "k2q01_d": TransformValues(
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["1"], "new_label": ["Yes"]}
         )
     }
     result = transform_values(lf, transforms, 2016).collect()
-    expected = pl.DataFrame({"k2q01_d": [1, 1, 3], "k2q01_d_label": [None, "Yes", None]})
+    expected = pl.DataFrame({"k2q01_d": [1.0, 1.0, 3.0], "k2q01_d_label": [None, "Yes", None]})
     assert_frame_equal(result, expected)
 
 
@@ -104,7 +104,7 @@ def test_existing_label_cols_are_updated_with_values_filled():
         )
     }
     result = transform_values(lf, transforms, 2016).collect()
-    expected = pl.DataFrame({"k2q01_d": [2, 2, 3], "k2q01_d_label": ["Yes", "Yes", None]})
+    expected = pl.DataFrame({"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["Yes", "Yes", None]})
     assert_frame_equal(result, expected)
 
 
@@ -127,5 +127,8 @@ def test_matching_year_but_no_matching_values_creates_null_label_column():
         )
     }
     result = transform_values(lf, transforms, 2017).collect()
-    expected = pl.DataFrame({"k2q01_d": [1, 2, 3], "k2q01_d_label": [None, None, None]})
+    expected = pl.DataFrame(
+        {"k2q01_d": [1, 2, 3], "k2q01_d_label": [None, None, None]},
+        schema={"k2q01_d": pl.Int64, "k2q01_d_label": pl.Utf8},
+    )
     assert_frame_equal(result, expected)
