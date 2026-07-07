@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import polars as pl
 
-from nsch.harmonize import RenameRule, rename_vars
+from nsch.harmonize import MergeRule, RenameRule, merge_vars, rename_vars
 
 
 def test_renames_a_column_for_a_matching_year() -> None:
@@ -50,3 +50,20 @@ def test_applies_several_rules_in_one_call() -> None:
     }
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["k4q02_r", "family", "hhid"]
+
+
+# Test to merge Columns
+
+
+def test_merges_prefferd_colums() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1, 2], "k4q02_r": [3, 4], "hhid": [5, 6]})
+    merge: dict[str, MergeRule] = {
+        "gowhensick": {
+            "years": ["2023"],
+            "column_preferred": "k4q02_r",
+            "column_fallback": "gowhensick",
+        }
+    }
+    result = merge_vars(lf, merge, 2023).collect()
+    assert result.columns == ["k4q02_r", "hhid"]
+    assert result["k4q02_r"].to_list() == [1, 2]

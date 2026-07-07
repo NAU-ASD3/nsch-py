@@ -68,3 +68,17 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
         if old_label in present:
             mapping[old_label] = f"{new_name}_label"
     return lf.rename(mapping)
+
+
+# Merge Preferred Columns
+
+
+class MergeRule(TypedDict):
+    """One merge rule: the years it applies to, and the preferred and fallback columns."""
+
+    years: list[str]
+    new_name: str
+
+
+def merge_vars(lf: pl.LazyFrame, merge: dict[str, MergeRule], year: int) -> pl.LazyFrame:
+    raise NotImplementedError
