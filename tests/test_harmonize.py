@@ -7,7 +7,7 @@ import warnings
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from nsch.harmonize import TransformValues, transform_values
+from nsch.harmonize import TransformValues, subset_vars, transform_values
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -137,3 +137,9 @@ def test_matching_year_but_no_matching_values_creates_null_label_column():
         schema={"k2q01_d": pl.Int64, "k2q01_d_label": pl.Utf8},
     )
     assert_frame_equal(result, expected)
+
+
+def test_subset_vars_retains_only_desired_columns_plus_labels():
+    df = pl.DataFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
+    result = subset_vars(df, ["a", "c"])
+    assert result.columns == ["a", "c", "a_label"]
