@@ -117,7 +117,7 @@ def transform_values(
     return transformed_lf
 
 
-def subset_vars(df: pl.DataFrame, desired_variables: list[str]) -> pl.DataFrame:
+def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
     """Subset_vars
 
     Returns a new ``pl.DataFrame`` containing only the columns listed
@@ -129,14 +129,15 @@ def subset_vars(df: pl.DataFrame, desired_variables: list[str]) -> pl.DataFrame:
     and their ``_label`` companions.
 
     """
-    # Warn for each desired variable not found in df.
-    missing = set(desired_variables) - set(df.columns)
+    lf_variables = lf.collect_schema().names()
+    # Warn for each desired variable not found xin df.
+    missing = set(desired_variables) - set(lf_variables)
     for m in missing:
-        warnings.warn(f"Desired variable {m} not found in df", category=UserWarning, stacklevel=2)
+        warnings.warn(UserWarning(f"Desired variable {m} not found in lf"), stacklevel=2)
 
     # Collect the data columns plus any _label companions.
-    present = [c for c in desired_variables if c in df.columns]
+    present = [c for c in desired_variables if c in lf_variables]
     label_cols = [l_col + "_label" for l_col in present]
-    label_cols = [l_col for l_col in label_cols if l_col in df.columns]
+    label_cols = [l_col for l_col in label_cols if l_col in lf_variables]
     keep = present + label_cols
-    return df.select(keep)
+    return lf.select(keep)

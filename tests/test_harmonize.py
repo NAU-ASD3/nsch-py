@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 
 import polars as pl
+import pytest
 from polars.testing import assert_frame_equal
 
 from nsch.harmonize import TransformValues, subset_vars, transform_values
@@ -140,6 +141,12 @@ def test_matching_year_but_no_matching_values_creates_null_label_column():
 
 
 def test_subset_vars_retains_only_desired_columns_plus_labels():
-    df = pl.DataFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
-    result = subset_vars(df, ["a", "c"])
-    assert result.columns == ["a", "c", "a_label"]
+    lf = pl.LazyFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
+    result = subset_vars(lf, ["a", "c"])
+    assert result.collect_schema().names() == ["a", "c", "a_label"]
+
+
+def test_warning_for_missing_desired_subset_variable():
+    df = pl.LazyFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
+    with pytest.warns(UserWarning, match="not found"):
+        subset_vars(df, ["a", "x"])
