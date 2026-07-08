@@ -1,17 +1,8 @@
-"""Remap answer codes per year for harmonize module
-
-``transform_values`` applies value and label remapping rules to a single year's
-raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
-transformed. For each variable in ``transforms`` whose ``years`` vector includes
-``str(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
-entries and replaces each matching numeric value with its new value. It creates
-or updates the corresponding ``_label`` column with the ``new_label`` text for
-remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
-
-"""
+"""Remap answer codes per year for harmonize module"""
 
 from __future__ import annotations
 
+import warnings
 from typing import TypedDict
 
 import polars as pl
@@ -30,6 +21,14 @@ def transform_values(
     lf: pl.LazyFrame, transforms: dict[str, TransformValues], year: int
 ) -> pl.LazyFrame:
     """Apply value and label remapping rules to transform a single year's raw numeric pl.LazyFrame.
+
+    ``transform_values`` applies value and label remapping rules to a single year's
+    raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
+    transformed. For each variable in ``transforms`` whose ``years`` vector includes
+    ``str(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
+    entries and replaces each matching numeric value with its new value. It creates
+    or updates the corresponding ``_label`` column with the ``new_label`` text for
+    remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
 
     Parameters
     ----------
@@ -116,3 +115,28 @@ def transform_values(
             )
 
     return transformed_lf
+
+
+def subset_vars(df: pl.DataFrame, desired_variables: list[str]) -> pl.DataFrame:
+    """Subset_vars
+
+    Returns a new ``pl.DataFrame`` containing only the columns listed
+    in ``desired_variables``, plus any corresponding ``_label``
+    companion columns that exist.  Issues a ``warning`` for each
+    variable in ``desired_variables`` not found in ``dt`` which is
+    expected when a variable does not exist in a particular year.
+    Returns a new ``pl.DataFrame`` containing only the desired columns
+    and their ``_label`` companions.
+
+    """
+    # Warn for each desired variable not found in df.
+    missing = set(desired_variables) - set(df.columns)
+    for m in missing:
+        warnings.warn(f"Desired variable {m} not found in df", category=UserWarning, stacklevel=2)
+
+    # Collect the data columns plus any _label companions.
+    present = [c for c in desired_variables if c in df.columns]
+    label_cols = [l_col + "_label" for l_col in present]
+    label_cols = [l_col for l_col in label_cols if l_col in df.columns]
+    keep = present + label_cols
+    return df.select(keep)
