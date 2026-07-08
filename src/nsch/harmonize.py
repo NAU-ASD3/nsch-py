@@ -1,14 +1,4 @@
-"""Remap answer codes per year for harmonize module
-
-``transform_values`` applies value and label remapping rules to a single year's
-raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
-transformed. For each variable in ``transforms`` whose ``years`` vector includes
-``str(year)` it iterates over the paired ``value``/ ``new_value``/``new_label``
-entries and replaces each matching numeric value with its new value. It creates
-or updates the corresponding ``_label`` column with the ``new_label`` text for
-remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
-
-"""
+"""Functions for the harmonize module"""
 
 from __future__ import annotations
 
@@ -30,6 +20,14 @@ def transform_values(
     lf: pl.LazyFrame, transforms: dict[str, TransformValues], year: int
 ) -> pl.LazyFrame:
     """Apply value and label remapping rules to transform a single year's raw numeric pl.LazyFrame.
+
+    ``transform_values`` applies value and label remapping rules to a single year's
+    raw numeric ``pl.LazyFrame`` and returns a new (lazy) frame with values
+    transformed. For each variable in ``transforms`` whose ``years`` vector includes
+    ``str(year)`` it iterates over the paired ``value``/ ``new_value``/``new_label``
+    entries and replaces each matching numeric value with its new value. It creates
+    or updates the corresponding ``_label`` column with the ``new_label`` text for
+    remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
 
     Parameters
     ----------
@@ -101,9 +99,19 @@ def transform_values(
                     "_new_label": details["new_label"],
                 }
             ).lazy()
+            # if the number of values in the transform is not unique,
+            # raise an error to protect against duplicate rows from a bad config
+            if lookup.select(pl.col(transform_variable_name)).collect().n_unique() != len(
+                details["value"]
+            ):
+                raise ValueError(
+                    f"Duplicate values found in transform for variable {transform_variable_name}"
+                )
 
             transformed_lf = (
-                transformed_lf.join(lookup, on=transform_variable_name, how="left")
+                transformed_lf.join(
+                    lookup, on=transform_variable_name, how="left", maintain_order="left"
+                )
                 .with_columns(
                     [
                         pl.coalesce(["_new_value", pl.col(transform_variable_name)]).alias(
