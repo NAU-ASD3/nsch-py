@@ -128,9 +128,38 @@ def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
     Returns a new ``pl.DataFrame`` containing only the desired columns
     and their ``_label`` companions.
 
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        A Polars LazyFrame to select desired variable from
+    desired_variables : list[str]
+        A list of desired variable column names, as strings
+
+    Returns
+    -------
+    a pl.LazyFrame containing only the variables selected using
+    ``desired_variables`` and their ``_label`` columns
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame(
+    ...     {"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]}
+    ... )
+    >>> subset_vars(lf, ["a", "c"]).collect()
+    shape: (3, 3)
+    ┌─────┬─────┬─────────┐
+    │ a   ┆ c   ┆ a_label │
+    │ --- ┆ --- ┆ ---     │
+    │ i64 ┆ i64 ┆ str     │
+    ╞═════╪═════╪═════════╡
+    │ 1   ┆ 7   ┆ x       │
+    │ 2   ┆ 8   ┆ y       │
+    │ 3   ┆ 9   ┆ z       │
+    └─────┴─────┴─────────┘
     """
     lf_variables = lf.collect_schema().names()
-    # Warn for each desired variable not found xin df.
+    # Warn for each desired variable not found in df.
     missing = set(desired_variables) - set(lf_variables)
     for m in missing:
         warnings.warn(UserWarning(f"Desired variable {m} not found in lf"), stacklevel=2)
