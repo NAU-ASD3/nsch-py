@@ -11,7 +11,7 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     Checks that each column (excluding `year`) has at least one non-missing value
     in each year present in the data. It accepts a `pl.DataFrame` and returns a
     ``pl.DataFrame`` with a per-column summary of the total number of years, total
-    number of years with data,and a list of years which are entirely missing for
+    number of years with data, and a list of years which are entirely missing for
     that column. It gives a snapshot of missingness in variables across survey years.
 
     Parameters
@@ -32,7 +32,7 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         When the input contains no rows, the function still returns a Polars DataFrame
         with the canonical four columns and their declared dtypes. This is intentional:
         callers can always do ``df["col"]`` or check ``df.is_empty()`` without first
-        guarding against a missing column. This deviates from the R versions's
+        guarding against a missing column. This deviates from the R version's
         ``rbindlist(list())`` which returns a 0x0 frame.
 
     Examples
@@ -144,7 +144,7 @@ def check_na_rates(df: pl.DataFrame) -> pl.DataFrame:
     └──────────┴──────┴─────────┴─────────┘
     """
     if not isinstance(df, pl.DataFrame):
-        raise TypeError("Input must be a Polars DataFrame")
+        raise TypeError("Input must be a polars DataFrame")
     if "year" not in df.columns:
         raise ValueError("Input DataFrame must contain a 'year' column")
 
