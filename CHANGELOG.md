@@ -12,13 +12,13 @@ so each version stays unique and the date stays honest.
 
 - Added `subset_vars` to select a subset of desired variables from a given LazyFrame
 
+## 2026.7.8 (PR#47)
+
+- Added `transform_values` for per-year value and label transformation.
+
 ## 2026.7.3 (PR#38)
 
 - Added `check_year_coverage` to report per-variable year coverage.
-
-## 2026.7.2 (PR#47)
-
-- Added `transform_values` for per-year value and label transformation.
 
 ## 2026.6.29 (PR#46)
 

@@ -18,10 +18,8 @@ def test_value_is_remapped_for_matching_year_and_label_column_is_created():
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["1"], "new_label": ["Yes"]}
         )
     }
-    result = transform_values(lf, transforms, 2016).collect().sort("k2q01_d")
-    expected = pl.DataFrame(
-        {"k2q01_d": [1.0, 1.0, 3.0], "k2q01_d_label": [None, "Yes", None]}
-    ).sort("k2q01_d")
+    result = transform_values(lf, transforms, 2016).collect()
+    expected = pl.DataFrame({"k2q01_d": [1.0, 1.0, 3.0], "k2q01_d_label": [None, "Yes", None]})
     assert_frame_equal(result, expected)
 
 
@@ -57,7 +55,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
             },
         ),
     }
-    result = transform_values(lf, transforms, 2016).collect().sort("family")
+    result = transform_values(lf, transforms, 2016).collect()
     expected = pl.DataFrame(
         {
             "family": [1, 1, 2, 2],
@@ -65,7 +63,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
             "family_label": ["Two Parents", "Two Parents", "Other", "Other"],
             "hoursleep_label": ["7 hours", "7 hours", "8 hours", "8 hours"],
         }
-    ).sort("family")
+    )
     assert_frame_equal(result, expected)
 
 
@@ -81,8 +79,8 @@ def test_label_only_transforms_work():
             }
         )
     }
-    result = transform_values(lf, transforms, 2017).collect().sort("sex")
-    expected = pl.DataFrame({"sex": [1, 2, 1], "sex_label": ["Male", "Female", "Male"]}).sort("sex")
+    result = transform_values(lf, transforms, 2017).collect()
+    expected = pl.DataFrame({"sex": [1, 2, 1], "sex_label": ["Male", "Female", "Male"]})
     assert_frame_equal(result, expected)
 
 
@@ -107,10 +105,8 @@ def test_existing_label_cols_are_updated_with_values_filled():
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["2"], "new_label": ["Yes"]}
         )
     }
-    result = transform_values(lf, transforms, 2016).collect().sort("k2q01_d")
-    expected = pl.DataFrame(
-        {"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["Yes", "Yes", None]}
-    ).sort("k2q01_d")
+    result = transform_values(lf, transforms, 2016).collect()
+    expected = pl.DataFrame({"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["Yes", "Yes", None]})
     assert_frame_equal(result, expected)
 
 
@@ -138,6 +134,23 @@ def test_matching_year_but_no_matching_values_creates_null_label_column():
         schema={"k2q01_d": pl.Int64, "k2q01_d_label": pl.Utf8},
     )
     assert_frame_equal(result, expected)
+
+    
+def test_raises_error_for_duplicate_values_in_lookup():
+    # Protects against a bad Config
+    lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
+    transforms = {
+        "k2q01_d": TransformValues(
+            {
+                "years": ["2016", "2017"],
+                "value": ["2", "2"],
+                "new_value": ["2", "3"],
+                "new_label": ["Yes", "Yes"],
+            }
+        )
+    }
+    with pytest.raises(ValueError, match="Duplicate"):
+        transform_values(lf, transforms, 2016)
 
 
 def test_subset_vars_retains_only_desired_columns_plus_labels():
