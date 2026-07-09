@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.validate import check_year_coverage, check_label_consistency
+from nsch.validate import check_label_consistency, check_year_coverage
 
 
 def test_correct_output_format_and_missing_years():
@@ -33,11 +33,13 @@ def test_correct_output_format_and_missing_years():
     )
     assert_frame_equal(result, expected)
 
+
 def test_contains_year_column():
     # Raises an error when the required ``year`` column is missing.
     df = pl.DataFrame({"x": [1, 2]})
     with pytest.raises(ValueError, match="year"):
         check_year_coverage(df)
+
 
 def test_null_year_raises_value_error():
     # Raises an error if the ``year`` column contains null values
@@ -45,7 +47,8 @@ def test_null_year_raises_value_error():
     df = pl.DataFrame({"year": ["2016", None, "2017"], "x": [1, 2, 3]})
     with pytest.raises(ValueError, match="year"):
         check_year_coverage(df)
-        
+
+
 def test_identifies_variable_entirely_NA_in_one_year():
     # Identifies a variable that is entirely missing in a single year.
     df = pl.DataFrame(
@@ -62,7 +65,8 @@ def test_identifies_variable_entirely_NA_in_one_year():
     )
     assert_frame_equal(result, expected)
 
- def test_empty_dataframe_returns_typed_empty_dataframe():
+
+def test_empty_dataframe_returns_typed_empty_dataframe():
     # Returns a typed empty DataFrame with the canonical four columns
     # and their declared dtypes when no variables are present.
     df = pl.DataFrame({"year": ["2016", "2017"]})
@@ -76,7 +80,8 @@ def test_identifies_variable_entirely_NA_in_one_year():
         "missing_years": pl.Utf8,
     }
     assert result.is_empty()
-    
+
+
 def test_dataframe_with_empty_variable_column_returns_zero_values():
     # Returns zero values for a DataFrame with an empty variable column
     df = pl.DataFrame({"year": [], "x": []})
@@ -91,12 +96,16 @@ def test_dataframe_with_empty_variable_column_returns_zero_values():
     )
     assert_frame_equal(result, expected)
 
+
 def test_non_polars_dataframe_raises_type_error():
     # Raises ``TypeError`` when the input is not a Polars DataFrame.
     df = {"year": ["2016", "2016"], "x": [1, 2]}
     with pytest.raises(TypeError, match="polars"):
         check_year_coverage(df)
+
+
 # --- check_label_consistency ------------------------------------------------
+
 
 def test_detects_inconsistent_levels_across_years() -> None:
     df = pl.DataFrame(
@@ -112,6 +121,7 @@ def test_detects_inconsistent_levels_across_years() -> None:
     assert status_row["n_level_sets"].to_list() == [2]
     assert status_row["levels_by_year"].to_list() == ["2016={A|B}; 2017={A|C}"]
 
+
 def test_consistent_levels_across_years_returns_true() -> None:
     df = pl.DataFrame(
         {
@@ -124,6 +134,7 @@ def test_consistent_levels_across_years_returns_true() -> None:
     assert status_row["is_consistent"].to_list() == [True]
     assert status_row["n_level_sets"].to_list() == [1]
 
+
 def test_skips_non_enum_columns() -> None:
     df = pl.DataFrame(
         {
@@ -135,21 +146,15 @@ def test_skips_non_enum_columns() -> None:
     result = check_label_consistency(df)
     assert result["variable"].to_list() == ["status"]
 
+
 def test_returns_empty_when_no_enum_columns_present() -> None:
     df = pl.DataFrame({"year": [2016, 2017], "x": [1, 2]})
     result = check_label_consistency(df)
     assert result.columns == ["variable", "is_consistent", "n_level_sets", "levels_by_year"]
     assert result.height == 0
 
+
 def test_label_consistency_errors_without_year_column() -> None:
     df = pl.DataFrame({"status": pl.Series(["A", "B"], dtype=pl.Enum(["A", "B"]))})
     with pytest.raises(ValueError, match="year"):
         check_label_consistency(df)
-
-
-
-
-
-
-
-

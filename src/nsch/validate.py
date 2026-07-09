@@ -3,15 +3,7 @@
 Each function here takes the combined dataset and *describes* it without
 changing it: a quality-control pass run after the pipeline has collected. They
 work on an eager ``pl.DataFrame`` (not a ``LazyFrame``), and the four tagged-NA
-sentinels (996-999) are already real nulls by the time they see the data."""
-"""Per-variable year coverage for the validate module
-
-``check_year_coverage`` checks that each column (excluding `year`) has
-at least one non-missing value in each year present in the data. It accepts
-a `pl.DataFrame` and returns a `pl.DataFrame` with a per-column summary of the
-total number of years, total number of years with data,
-and a list of years which are entirely missing for that column.
-It gives a snapshot of missingness in variables across survey years.
+sentinels (996-999) are already real nulls by the time they see the data.
 """
 
 from __future__ import annotations
@@ -19,16 +11,23 @@ from __future__ import annotations
 import polars as pl
 
 __all__ = ["check_label_consistency", "check_year_coverage"]
-    
+
+
 def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
     """Report per-variable year coverage across the combined data.
 
+    ``check_year_coverage`` checks that each column (excluding `year`) has
+    at least one non-missing value in each year present in the data. It accepts
+    a `pl.DataFrame` and returns a `pl.DataFrame` with a per-column summary of the
+    total number of years, total number of years with data,
+    and a list of years which are entirely missing for that column.
+    It gives a snapshot of missingness in variables across survey years.
     Parameters
     ----------
     df: pl.DataFrame
         A DataFrame with a ``year`` column and one or more other columns
         with data collected across multiple years.
-    
+
     Returns
     -------
     pl.DataFrame
@@ -111,7 +110,7 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
         {
             "variable": variables,
             "n_years_data": n_years_data,
-          "n_years_total": n_years_total_list,
+            "n_years_total": n_years_total_list,
             "missing_years": missing_years,
         },
         schema={
@@ -120,8 +119,8 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
             "n_years_total": pl.Int64,
             "missing_years": pl.Utf8,
         },
-   
     )
+
 
 def check_label_consistency(df: pl.DataFrame) -> pl.DataFrame:
     """Report whether each Enum column's levels stay the same across years.
@@ -218,4 +217,5 @@ def check_label_consistency(df: pl.DataFrame) -> pl.DataFrame:
             "is_consistent": pl.Boolean,
             "n_level_sets": pl.Int64,
             "levels_by_year": pl.String,
-           
+        },
+    )
