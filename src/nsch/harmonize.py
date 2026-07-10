@@ -27,7 +27,7 @@ def transform_values(
     ``str(year)`` it iterates over the paired ``value``/ ``new_value``/``new_label``
     entries and replaces each matching numeric value with its new value. It creates
     or updates the corresponding ``_label`` column with the ``new_label`` text for
-    remapped rows and silently skips variables not present in the input ``pl.LazyFrame``
+    remapped rows and silently skips variables not present in the input ``pl.LazyFrame``.
 
     Parameters
     ----------
@@ -91,7 +91,7 @@ def transform_values(
                 # Variable_names is a set, use .add instead of .append
                 variable_names.add(label_col)
 
-            # Create a mapping bewtween values and new values/labels for the transform
+            # Create a mapping between values and new values/labels for the transform
             lookup = pl.DataFrame(
                 {
                     transform_variable_name: pl.Series(details["value"]).cast(column_dtype),
