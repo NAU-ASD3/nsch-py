@@ -134,7 +134,7 @@ def test_matching_year_but_no_matching_values_creates_null_label_column():
         schema={"k2q01_d": pl.Int64, "k2q01_d_label": pl.Utf8},
     )
     assert_frame_equal(result, expected)
-    
+
 
 def test_raises_error_for_duplicate_values_in_lookup():
     # Protects against a bad Config
