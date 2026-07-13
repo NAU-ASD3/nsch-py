@@ -6,7 +6,7 @@ from typing import TypedDict
 
 import polars as pl
 
-__all__ = ["RenameRule", "rename_vars", "TransformValues", "transform_values"]
+__all__ = ["RenameRule", "TransformValues", "rename_vars", "transform_values"]
 
 
 class RenameRule(TypedDict):
@@ -15,8 +15,11 @@ class RenameRule(TypedDict):
     years: list[str]
     new_name: str
 
+
 class TransformValues(TypedDict):
-    """One variable's transform rule: the years and values it applies to, and the new values and labels."""
+    """One variable's transform rule:
+    the years and values it applies to, and the new values and labels."""
+
     years: list[str]
     value: list[str]
     new_value: list[str]

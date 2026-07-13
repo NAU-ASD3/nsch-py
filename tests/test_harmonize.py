@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.harmonize import RenameRule, rename_vars, TransformValues, transform_values
+from nsch.harmonize import RenameRule, TransformValues, rename_vars, transform_values
 
 
 def test_renames_a_column_for_a_matching_year() -> None:
@@ -54,6 +54,7 @@ def test_applies_several_rules_in_one_call() -> None:
     }
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["k4q02_r", "family", "hhid"]
+
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
     lf = pl.LazyFrame({"k2q01_d": [1.0, 2.0, 3.0]})
