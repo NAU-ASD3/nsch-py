@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.14 (PR#44)
+
+- Added `check_na_rates` for checking per-variable NA rates per year
+
 ## 2026.7.10 (PR#47)
 
 - Added `transform_values` for per-year value and label transformation.
