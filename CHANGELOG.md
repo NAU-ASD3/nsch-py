@@ -12,6 +12,10 @@ so each version stays unique and the date stays honest.
 
 - Added `subset_vars` to select a subset of desired variables from a given LazyFrame
 
+## 2026.7.14 (PR#44)
+
+- Added `check_na_rates` for checking per-variable NA rates per year
+
 ## 2026.7.10 (PR#47)
 
 - Added `transform_values` for per-year value and label transformation.
