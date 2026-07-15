@@ -7,7 +7,7 @@ from typing import TypedDict
 
 import polars as pl
 
-__all__ = ["TransformValues", "transform_values"]
+__all__ = ["TransformValues", "subset_vars", "transform_values"]
 
 
 class TransformValues(TypedDict):
@@ -128,15 +128,13 @@ def transform_values(
 
 
 def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
-    """Subset_vars
+    """ "Select desired variables and their label companions.
 
-    Returns a new ``pl.DataFrame`` containing only the columns listed
+    Returns a new ``pl.LazyFrame`` containing only the columns listed
     in ``desired_variables``, plus any corresponding ``_label``
     companion columns that exist.  Issues a ``warning`` for each
-    variable in ``desired_variables`` not found in ``dt`` which is
+    variable in ``desired_variables`` not found in ``lf`` which is
     expected when a variable does not exist in a particular year.
-    Returns a new ``pl.DataFrame`` containing only the desired columns
-    and their ``_label`` companions.
 
     Parameters
     ----------
@@ -170,7 +168,7 @@ def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
     """
     lf_variables = lf.collect_schema().names()
     # Warn for each desired variable not found in df.
-    missing = set(desired_variables) - set(lf_variables)
+    missing = [c for c in desired_variables if c not in lf_variables]
     for m in missing:
         warnings.warn(UserWarning(f"Desired variable {m} not found in lf"), stacklevel=2)
 
