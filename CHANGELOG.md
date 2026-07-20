@@ -8,17 +8,20 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.20 (PR#43)
+
+- Added `check_label_consistency` for reporting factor-level consistency across years
+
+## 2026.7.14 (PR#44)
+
+- Added `check_na_rates` for checking per-variable NA rates per year
+
 ## 2026.7.10 (PR#47)
 
 - Added `transform_values` for per-year value and label transformation.
 
 ## 2026.7.3 (PR#38)
 
-## [2026.6.28] - 2026-06-28
-
-- Added ⁠ check_label_consistency ⁠ for reporting the levels present in each Enum column (#NN)
-
-## [2026.6.17] - 2026-06-17
 - Added `check_year_coverage` to report per-variable year coverage.
 
 ## 2026.6.29 (PR#46)
