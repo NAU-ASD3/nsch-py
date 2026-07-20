@@ -65,5 +65,6 @@ nav:
   - Onboarding: onboarding.md
   - Development walkthrough: development-walkthrough.md
   - Design decisions: design-decisions.md
+  - Adding a new survey year: adding-a-new-year.md
   # API reference and operational docs will be added as the package
   # gains functions in subsequent PRs.
