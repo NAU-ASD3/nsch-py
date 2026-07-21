@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.21 (PR#14)
+
+- Added a Version 0 runbook documenting the workflow for adding a new NSCH survey year, including guidance for variable configuration, transforms, renames, merges, and validation.
+
 ## 2026.7.10 (PR#47)
 
 - Added `transform_values` for per-year value and label transformation.
