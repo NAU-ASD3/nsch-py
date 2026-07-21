@@ -128,7 +128,7 @@ def transform_values(
 
 
 def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
-    """ "Select desired variables and their label companions.
+    """Select desired variables and their label companions.
 
     Returns a new ``pl.LazyFrame`` containing only the columns listed
     in ``desired_variables``, plus any corresponding ``_label``
