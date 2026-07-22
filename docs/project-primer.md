@@ -28,7 +28,7 @@ kinds of readers to their next document.
 ### What we study
 
 The ASD3 Outcomes Project at Northern Arizona University, funded through the
-NIH Autism Data Science Initiative, studies health-care access and service
+Autism Data Science Institute (ADSI), studies health-care access and service
 outcomes for children with autism in the United States. Our primary data
 source is the [National Survey of Children's Health
 (NSCH)](https://www.census.gov/programs-surveys/nsch.html), a large annual
@@ -107,7 +107,11 @@ new can't reconstruct our reasoning from the docs, we consider that a bug.
 
 ### The bigger picture
 
-The SOAK replication is only the first consumer of this data. Planned and
+The SOAK replication, which reproduces Vince Sutherland's original
+results, is only the first consumer of this data. Beyond it sits an
+external one: as part of the grant, one of ADSI's designated replication
+centers independently reproduces our findings, so the harmonized dataset
+has an outside audience built in from the start. Planned and
 likely work on the wider project includes deep learning models trained on the
 same harmonized dataset, geospatial work mapping service access and outcomes,
 and the construction of a composite index. Parts of the larger picture will
