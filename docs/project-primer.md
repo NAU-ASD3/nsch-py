@@ -1,12 +1,15 @@
 # Project Primer
 
-**Last revised:** July 14, 2026 ·
+**Last revised:** July 22, 2026 ·
 **Maintainer:** Chris Reger ·
 **Covers:** [`NAU-ASD3/nsch`](https://github.com/NAU-ASD3/nsch) (R) and [`NAU-ASD3/nsch-py`](https://github.com/NAU-ASD3/nsch-py) (Python)
 
 This page gets revised as the project evolves, so the date above tells you how
 stale it might be. If you spot something wrong or out of date, open an issue
-or fix it in a PR.
+or fix it in a PR. New to GitHub? Here is how to
+[open an issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue)
+and how to
+[open a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
 ---
 
@@ -33,12 +36,24 @@ survey of children's health, health care, and family context that the U.S.
 Census Bureau fields on behalf of the Health Resources and Services
 Administration's Maternal and Child Health Bureau (HRSA/MCHB).
 
+The NSCH is a broad child-health survey, not an autism-specific one. What
+makes it useful to us is that it identifies children whose caregivers report
+an autism diagnosis and, in the same records, captures the health-care access
+and family-context measures the project studies. The autism focus lives in
+how we use the data, not in the survey itself or in these packages.
+
 A note on scale and access, since both surprise people. The survey reaches
 tens of thousands of children per year — on the order of 20,000 to 55,000
-depending on the year — so a combined 2016 to 2024 dataset runs to several
-hundred thousand rows. And the public-use files are exactly that: public. No
-application, no data-use agreement. The acquire stage of our pipeline
-downloads them straight from the Census Bureau's site.
+depending on the year, each described by roughly 430 to 480 variables — so a
+combined 2016 to 2024 dataset runs to several hundred thousand rows. And the
+public-use files are exactly that: public. No application, no data-use
+agreement. The acquire stage of our pipeline downloads them straight from
+[the Census Bureau's NSCH page](https://www.census.gov/programs-surveys/nsch.html).
+
+The survey also ships design variables, sampling weights and stratum
+identifiers, that let a sample stand in for the whole population. The packages
+carry those columns through untouched. The survey-weighted estimation that
+actually uses them belongs to the analysis layer, not here.
 
 Methodologically, we lean on interpretable machine learning. Prediction alone
 is rarely the interesting part. We want to know which factors drive the
@@ -46,22 +61,32 @@ predictions, and whether a model trained on some survey years still works on
 others. That second question uses SOAK (Same/Other/All K-fold
 cross-validation), an evaluation design that measures how well models
 transfer across subsets of the data ([Hocking et al. 2026, open
-access](https://doi.org/10.1002/sam.70055)). For us the subsets are spans of
-survey years. The SOAK paper is also the project's published analysis to
-date: its case studies include NSCH autism data from 2019 and 2020, so the
-method and this project grew up together. When this document mentions "the
-published analysis," that paper is the one it means.
+access](https://doi.org/10.1002/sam.70055)). For us those subsets are usually
+spans of survey years, though the same design works just as well on
+demographic subgroups. The SOAK paper is also the project's published
+analysis to date: its case studies include NSCH autism data from 2019 and
+2020, so the method and this project grew up together. When this document
+mentions "the published analysis," that paper is the one it means.
 
 ### Where the code came from
 
-The current work replicates and extends an earlier analysis pipeline built by
-Vince, a previous researcher on the project, together with Toby Hocking.
-Their work lives in three repositories: an [initial trial
+The current work replicates and extends an earlier analysis pipeline that
+Vince Sutherland, a previous researcher on the project, built together with
+Toby Hocking, roughly between 2023 and 2025. Their work lives in three
+repositories: an [initial trial
 run](https://github.com/tdhock/2024-01-ml-for-autism) of the ML methods on
 the 2019 and 2020 data, a data-preparation repo that standardized a subset
 of NSCH variables across 2016 to 2023, and a private HPC repo holding the
-cluster scripts and outputs behind the published SOAK analysis. The R package came together over the year that followed; the Python
-port began in summer 2026.
+cluster scripts and outputs behind the published SOAK analysis. The R package
+came together over the year that followed; the Python port began in summer
+2026.
+
+The lineage is worth spelling out, since the repository names do not. The
+trial run and the data-prep repo are the work that `nsch`, and now its Python
+port `nsch-py`, replace. The private analysis repo is the work that
+`nsch-ml-py` replaces. So the two data packages carry forward the "get the
+data ready" half of the original pipeline, and the analysis repo carries
+forward the "run the models" half.
 
 That first pass proved the concept, and we owe it a lot. It also had limits
 we are deliberately correcting. The prep stage went through CSV
@@ -82,11 +107,11 @@ new can't reconstruct our reasoning from the docs, we consider that a bug.
 
 ### The bigger picture
 
-The replication is only the first consumer of this data. Planned and likely
-work on the wider project includes deep learning models trained on the same
-harmonized dataset, geospatial work mapping service access and outcomes, and
-the construction of a composite index. Parts of the larger picture will also
-draw on primary data sources beyond the NSCH.
+The SOAK replication is only the first consumer of this data. Planned and
+likely work on the wider project includes deep learning models trained on the
+same harmonized dataset, geospatial work mapping service access and outcomes,
+and the construction of a composite index. Parts of the larger picture will
+also draw on primary data sources beyond the NSCH.
 
 That future matters for how we write code here today. These packages are
 shared infrastructure for a family of studies, and several other efforts will
@@ -96,12 +121,15 @@ carefully rather than just well enough for one paper.
 
 ### The repositories, and how they relate
 
+Listed roughly in the order they came to life, so the way each builds on the
+last is easy to follow:
+
 | Repository | Language | Role |
 |---|---|---|
-| [`NAU-ASD3/nsch`](https://github.com/NAU-ASD3/nsch) | R | The original data package. Downloads, harmonizes, and combines NSCH years. Mature; the **reference implementation**. |
-| [`NAU-ASD3/nsch-py`](https://github.com/NAU-ASD3/nsch-py) | Python | Ground-up reimplementation of the R package. This repo. |
+| Prior repos ([`2024-01-ml-for-autism`](https://github.com/tdhock/2024-01-ml-for-autism), `ASD3-machine-learning-prep`, `ASD3-machine-learning` (private)) | R | The original pipeline being replicated, built 2023–2025. Kept as historical reference. |
+| [`NAU-ASD3/nsch`](https://github.com/NAU-ASD3/nsch) | R | The data package. Downloads, harmonizes, and combines NSCH years. Mature; the **reference implementation**. Public-facing, though not yet formally published or advertised beyond the project. |
+| [`NAU-ASD3/nsch-py`](https://github.com/NAU-ASD3/nsch-py) | Python | Ground-up reimplementation of the R package, and the **current focus**. This repo. |
 | `nsch-ml-py` | Python | The analysis layer. Replicates the published analysis and extends it to newer survey years. Consumes the output of the data packages. |
-| Prior repos ([`2024-01-ml-for-autism`](https://github.com/tdhock/2024-01-ml-for-autism), `ASD3-machine-learning-prep`, `ASD3-machine-learning` (private)) | R | The original pipeline being replicated. Kept as historical reference. |
 
 The R package came first and remains the source of truth. The Python
 reimplementation exists so the whole project can live in one language and use
@@ -117,12 +145,14 @@ match exactly. Column order and dtypes are free to differ.
 - **Dr. Olivia Lindly** (Health Sciences) leads the project and supervises
   the data and analysis work.
 - **Dr. Ben Lucas** (Mathematics and Statistics) and **Dr. David Folch**
-  (Geography, Planning and Recreation) are collaborating faculty on the wider
-  project and serve as code reviewers.
+  (Geography, Planning and Recreation) are co-investigators on the wider
+  project. They co-supervise the data and analysis work and serve as code
+  reviewers.
 - **Dr. Toby Hocking** developed SOAK and built the original analysis with
-  Vince while at NAU. He is now at the Université de Sherbrooke in Canada and
-  involved as a consultant. He remains the authority on the R package and its
-  review standards, though he is much less involved day to day.
+  Vince Sutherland while at NAU. He is now at the Université de Sherbrooke in
+  Canada and involved as a consultant. He remains the authority on the R
+  package and its review standards, though he is much less involved day to
+  day.
 - **Chris Reger** (graduate student researcher) is the primary developer and
   maintainer of both data packages.
 - **Sakina Lord** and **Rahmat Adepo** (graduate student researchers) are
@@ -207,22 +237,34 @@ corrupt a merge.
 
 ### What the pipeline does
 
-Five stages, in order:
+Five stages, in order, and each is its own module in the package so you can
+find and review one layer at a time:
 
-1. **Acquire.** Download the official `.dta` and `.do` files for each
-   requested year from the Census Bureau.
-2. **Read.** Parse each Stata file. Variable labels, value labels, and all
-   four tagged missing-value types survive this step. Internally the tagged
-   NAs become the sentinel codes 996 to 999 so they can travel through
-   numeric processing without losing their identity.
-3. **Harmonize**, per year. Rename variables to the common scheme, remap
-   answer codes so the same answer means the same value in every year, merge
-   split variables, and keep only the variables listed in the config.
-4. **Combine.** Stack the harmonized years into one tidy table and apply the
-   labels, so coded values become readable categories and sentinel codes
-   resolve to their proper missing-value semantics.
-5. **Validate.** Check the combined result: expected factor levels, plausible
-   NA rates, full year coverage.
+1. **Acquire** (`acquire.py`). Download the official `.dta` and `.do` files
+   for each requested year from the Census Bureau.
+2. **Read** (`readers.py`). Parse each Stata file. Variable labels, value
+   labels, and all four tagged missing-value types survive this step.
+   Internally the tagged NAs become the sentinel codes 996 to 999 so they can
+   travel through numeric processing without losing their identity.
+3. **Harmonize** (`harmonize.py`), per year. Rename variables to the common
+   scheme, remap answer codes so the same answer means the same value in
+   every year, merge split variables, and keep only the variables listed in
+   the config.
+4. **Combine** (`combine.py`). Stack the harmonized years into one tidy table
+   and apply the labels, so coded values become readable categories and
+   sentinel codes resolve to their proper missing-value semantics.
+5. **Validate** (`validate.py`). Check the combined result: expected factor
+   levels, plausible NA rates, full year coverage.
+
+The single public function stitches these stages together; the module names
+above are also the names you will see in the migration plan and in review, so
+"the read layer" and `readers.py` mean the same thing.
+
+The whole pipeline runs on Polars LazyFrames, which describe the work without
+executing it and let the engine optimize the full sequence before it runs
+once at the very end. It stays lazy from the first read through the final
+combine. That design, and the reasons it pushed us toward Python in the first
+place, are written up in [design decisions](design-decisions.md).
 
 A few corners are genuinely fiddly. The 2016 file, for instance, lacks a
 grade variable that later years have, so the combine stage includes a
@@ -255,6 +297,11 @@ df["gendepin"].value_counts()        # one consistent coding, all years
 df.filter(pl.col("year") >= 2020)    # slice and go
 ```
 
+The `config_path` in that example points at the copy of the config shipped in
+the source tree, which is the default we develop against. It is an ordinary
+argument, though, so anyone using the package can point it at their own config
+file to keep or drop a different set of variables.
+
 The R package's equivalent, `nsch::get_clean_data()`, returns a `data.table`
 and is fully wired up today.
 
@@ -263,12 +310,18 @@ functions are exported and individually tested, so a contributor or a curious
 analyst can run any stage in isolation. The intended usage, though, is the
 single call above.
 
-**A status note for reviewers:** in the Python package, `get_clean_data` is
-the *target* interface. The functions behind it are landing one PR at a time,
-which means an individual PR you review may implement one stage's primitive
-while the end-to-end pipeline does not exist yet. The R package defines what
-each function must do, and the migration plan defines the PR sequence. If a
-PR seems like a small piece floating in space, that is why.
+**A status note for reviewers, and for anyone hoping to run this today:** in
+the Python package, `get_clean_data` is the *target* interface, and it is not
+wired up yet. Calling it right now will not run a pipeline. Its supporting
+functions are landing one PR at a time, which means an individual PR you
+review may implement one stage's primitive while the end-to-end pipeline does
+not exist. Until the Python port reaches parity, the R package
+(`nsch::get_clean_data()`) is the one to use for real analysis. The R package
+defines what each Python function must do, the migration plan defines the PR
+sequence, and the
+[changelog](https://github.com/NAU-ASD3/nsch-py/blob/main/CHANGELOG.md) tracks
+what has landed so far. If a PR seems like a small piece floating in space,
+that is why.
 
 ### Who the package is for
 
@@ -301,8 +354,10 @@ the code:
   modified. When a lookup needs to bridge a rename, we add a translation
   layer (an alias map) instead of editing the source data.
 - **Missingness is preserved end to end.** The four tagged NA types travel
-  through the pipeline as distinct sentinel codes and only get resolved at
-  the labeling step.
+  through the pipeline as distinct sentinel codes (996 to 999) and stay
+  numeric the whole way, so nothing collapses them by accident. They resolve
+  to proper missing values or readable categories only at the final labeling
+  step, when the combined table is built.
 - **Functions are small, single-purpose, and non-mutating.** The pipeline is
   a composition of plain functions on dataframes. No class hierarchies, no
   frameworks.
@@ -322,7 +377,9 @@ the validation reference for everything downstream.
 In the Python package, the scaffolding, CI, and documentation infrastructure
 are merged. Functional code is landing as a sequence of layer-by-layer PRs:
 read layer, config layer, harmonize layer, combine plus the orchestrator,
-validation, and finally the integration test against the R output.
+validation, and finally the integration test against the R output. The
+[changelog](https://github.com/NAU-ASD3/nsch-py/blob/main/CHANGELOG.md) is the
+running record of what has landed.
 
 After that, the analysis replication consumes the merged dataset, and a
 methods paper writes up the replication and the extension to 2024.
