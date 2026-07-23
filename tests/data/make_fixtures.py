@@ -34,7 +34,7 @@ def create_tagged_missing_dta() -> None:
 
 def create_mixed_types_dta() -> None:
     # Creates a dataset with mix of floats, string, and integer values
-    x_col = np.array([1.0, 2.0, "m", "n", "l", "d"], dtype=object)
+    x_col = np.array([1.5, 2.0, "m", "n", "l", "d"], dtype=object)
 
     df = pl.DataFrame(
         {
@@ -52,7 +52,7 @@ def create_mixed_types_dta() -> None:
         "tests/data/mixed_types.dta",
         missing_user_values={"x": ["m", "n", "l", "d"]},
         variable_value_labels={"x": {1: "Yes", 2: "No"}},
-        variable_format={"year": "float", "x": "int32", "y": "str", "stratum": "int32"},
+        variable_format={"year": "float", "x": "float", "y": "str", "stratum": "int32"},
     )
 
 
