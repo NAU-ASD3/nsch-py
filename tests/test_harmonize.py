@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.harmonize import TransformValues, transform_values
+from nsch.harmonize import TransformValues, subset_vars, transform_values
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -151,3 +151,15 @@ def test_raises_error_for_duplicate_values_in_lookup():
     }
     with pytest.raises(ValueError, match="Duplicate"):
         transform_values(lf, transforms, 2016)
+
+
+def test_subset_vars_retains_only_desired_columns_plus_labels():
+    lf = pl.LazyFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
+    result = subset_vars(lf, ["a", "c"])
+    assert result.collect_schema().names() == ["a", "c", "a_label"]
+
+
+def test_warning_for_missing_desired_subset_variable():
+    df = pl.LazyFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
+    with pytest.warns(UserWarning, match="not found"):
+        subset_vars(df, ["a", "x"])
