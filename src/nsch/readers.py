@@ -33,7 +33,9 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
     """Helper function to map each missingness type per column"""
     # use meta.missing_user_values to map "m"/"n"/"l"/"d" -> 996/997/998/999 per column.
     for col, missing_values in meta.missing_user_values.items():
-        local_map = {mv: TAGGED_NA_MAP[mv] for mv in missing_values}
+        local_map: dict[str, int] = {
+            mv: TAGGED_NA_MAP[mv] for mv in missing_values if isinstance(mv, str)
+        }
 
         def _convert_tagged_nas(
             val: int | float | str | None, local_map: dict[str, int] = local_map
