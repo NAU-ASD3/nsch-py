@@ -11,7 +11,6 @@ import pyreadstat
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Should this live in types?
 READSTAT_TO_POLARS = {
     "double": pl.Float64,
     "float": pl.Float32,
@@ -32,12 +31,11 @@ TAGGED_NA_MAP = {
 
 def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) -> pl.LazyFrame:
     """Helper function to map each missingness type per column"""
-    # Should this live inside the function?
     # use meta.missing_user_values to map "m"/"n"/"l"/"d" -> 996/997/998/999 per column.
     for col, missing_values in meta.missing_user_values.items():
         local_map = {mv: TAGGED_NA_MAP[mv] for mv in missing_values}
 
-        def _convert(
+        def _convert_tagged_nas(
             val: int | float | str | None, local_map: dict[str, int] = local_map
         ) -> int | None:
             if val is None:
@@ -48,26 +46,32 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
                 return None
             return int(val)
 
-        lf = lf.with_columns(pl.col(col).map_elements(_convert, return_dtype=pl.Int64).alias(col))
+        lf = lf.with_columns(
+            pl.col(col).map_elements(_convert_tagged_nas, return_dtype=pl.Int64).alias(col)
+        )
     return lf
 
 
 def read_nsch_dta(path: Path) -> pl.LazyFrame:
+    if not path.exists():
+        raise FileNotFoundError(
+            f".dta path should be the path to a Stata.dta file, "
+            f"but this file does not exist: {path}"
+        )
     df, meta = pyreadstat.read_dta(str(path), user_missing=True, output_format="polars")
-    # _rewrite_tagged_na uses meta.missing_user_values to map
-    # pyreadstat removes the . before missing values, so these are just strings with only the letter
-    # "m"/"n"/"l"/"d" -> 996/997/998/999 per column.
+    # _rewrite_tagged_na maps remaps nulls to our sentinel values
+    # pyreadstat removes the . before missing values, so these are strings
+    # with only the associated missingness letter
     lf = _rewrite_tagged_na(df.lazy(), meta)
 
     # Normalize stratum column: some years have "2A" which must become
-    # numeric 2 for consistency. (From R Code)
+    # numeric 2 for consistency.
     lf = lf.with_columns(
         pl.col("stratum").str.replace(r"^2[aA]?$", "2").cast(pl.Int64),
         pl.col("year").cast(pl.Int64),
     )
 
     # Convert schema to polars datatypes
-    # Convert stata int and char to polars (pl.Int64, pl.Utf8) -> polars_schema
     # already_handled holds columns already converted to Int64 by _rewrite_tagged_na
     already_handled = {"stratum", "year", *meta.missing_user_values.keys()}
     to_cast = set(meta.column_names) - already_handled
