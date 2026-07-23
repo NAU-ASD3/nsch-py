@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TypedDict
 
 import polars as pl
 
-__all__ = ["TransformValues", "transform_values"]
+__all__ = ["TransformValues", "subset_vars", "transform_values"]
 
 
 class TransformValues(TypedDict):
@@ -124,3 +125,56 @@ def transform_values(
             )
 
     return transformed_lf
+
+
+def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
+    """Select desired variables and their label companions.
+
+    Returns a new ``pl.LazyFrame`` containing only the columns listed
+    in ``desired_variables``, plus any corresponding ``_label``
+    companion columns that exist.  Issues a ``warning`` for each
+    variable in ``desired_variables`` not found in ``lf`` which is
+    expected when a variable does not exist in a particular year.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        A Polars LazyFrame to select desired variable from
+    desired_variables : list[str]
+        A list of desired variable column names, as strings
+
+    Returns
+    -------
+    a pl.LazyFrame containing only the variables selected using
+    ``desired_variables`` and their ``_label`` columns
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame(
+    ...     {"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]}
+    ... )
+    >>> subset_vars(lf, ["a", "c"]).collect()
+    shape: (3, 3)
+    ┌─────┬─────┬─────────┐
+    │ a   ┆ c   ┆ a_label │
+    │ --- ┆ --- ┆ ---     │
+    │ i64 ┆ i64 ┆ str     │
+    ╞═════╪═════╪═════════╡
+    │ 1   ┆ 7   ┆ x       │
+    │ 2   ┆ 8   ┆ y       │
+    │ 3   ┆ 9   ┆ z       │
+    └─────┴─────┴─────────┘
+    """
+    lf_variables = lf.collect_schema().names()
+    # Warn for each desired variable not found in df.
+    missing = [c for c in desired_variables if c not in lf_variables]
+    for m in missing:
+        warnings.warn(UserWarning(f"Desired variable {m} not found in lf"), stacklevel=2)
+
+    # Collect the data columns plus any _label companions.
+    present = [c for c in desired_variables if c in lf_variables]
+    label_cols = [l_col + "_label" for l_col in present]
+    label_cols = [l_col for l_col in label_cols if l_col in lf_variables]
+    keep = present + label_cols
+    return lf.select(keep)
