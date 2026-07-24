@@ -11,6 +11,9 @@ import pyreadstat
 if TYPE_CHECKING:
     from pathlib import Path
 
+__all__ = ["read_nsch_dta"]
+
+
 READSTAT_TO_POLARS = {
     "double": pl.Float64,
     "float": pl.Float32,
