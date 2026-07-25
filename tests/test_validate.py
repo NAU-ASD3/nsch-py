@@ -6,7 +6,99 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.validate import check_na_rates, check_year_coverage
+from nsch.validate import check_label_consistency, check_na_rates, check_year_coverage
+
+# Testing For ``check_label_consistency``
+
+
+def test_detects_inconsistent_levels_across_years() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2016, 2017, 2017],
+            "status": pl.Series(["A", "B", "A", "C"], dtype=pl.Enum(["A", "B", "C"])),
+        }
+    )
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["status"],
+            "is_consistent": [False],
+            "n_level_sets": [2],
+            "levels_by_year": ["2016={A|B}; 2017={A|C}"],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_consistent_levels_across_years_returns_true() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2016, 2017, 2017],
+            "status": pl.Series(["A", "B", "A", "B"], dtype=pl.Enum(["A", "B"])),
+        }
+    )
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["status"],
+            "is_consistent": [True],
+            "n_level_sets": [1],
+            "levels_by_year": ["2016={A|B}; 2017={A|B}"],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_skips_non_enum_columns() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2017],
+            "x": [1.0, 2.0],
+            "status": pl.Series(["A", "A"], dtype=pl.Enum(["A"])),
+        }
+    )
+    result = check_label_consistency(df)
+    assert result["variable"].to_list() == ["status"]
+
+
+def test_returns_typed_empty_dataframe_when_no_enum_columns() -> None:
+    df = pl.DataFrame({"year": [2016, 2017], "x": [1, 2]})
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {"variable": [], "is_consistent": [], "n_level_sets": [], "levels_by_year": []},
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_missing_year_column_raises_value_error_for_label_consistency() -> None:
+    df = pl.DataFrame({"status": pl.Series(["A", "B"], dtype=pl.Enum(["A", "B"]))})
+    with pytest.raises(ValueError, match="year"):
+        check_label_consistency(df)
+
+
+def test_non_polars_dataframe_raises_type_error_when_checking_label_consistency() -> None:
+    df_check_labels = {"year": [2016, 2017], "status": ["A", "B"]}
+    with pytest.raises(TypeError, match="polars DataFrame"):
+        check_label_consistency(df_check_labels)
+
 
 # Testing For ``check_year_coverage``
 

@@ -11,6 +11,14 @@ so each version stays unique and the date stays honest.
 ## 2026.7.21 (PR#55)
 
 - Added a Version 0 runbook documenting the workflow for adding a new NSCH survey year, including guidance for variable configuration, transforms, renames, merges, and validation.
+## 2026.7.21.1 (PR#43)
+
+- Added `check_label_consistency` for reporting factor-level consistency across years
+
+## 2026.7.21 (PR#49)
+
+- Added `subset_vars` to select a subset of desired variables from a given LazyFrame
+
 ## 2026.7.14 (PR#44)
 
 - Added `check_na_rates` for checking per-variable NA rates per year
