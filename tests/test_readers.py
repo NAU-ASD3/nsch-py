@@ -29,7 +29,7 @@ def test_parse_do_parses_variable_labels(tmp_path: Path) -> None:
     """Parse ``label var`` statements from a Stata do-file."""
     do_file = tmp_path / "example.do"
     do_file.write_text(
-        'label var SC_SEX "Sex of selected child"\n' 'label var SC_AGE "Age of selected child"\n'
+        'label var SC_SEX "Sex of selected child"\nlabel var SC_AGE "Age of selected child"\n'
     )
 
     result = parse_do(do_file)
@@ -50,7 +50,7 @@ def test_parse_do_parses_variable_labels(tmp_path: Path) -> None:
 def test_parse_do_parses_value_labels(tmp_path: Path) -> None:
     """Parse ``label define`` statements from a Stata do-file."""
     do_file = tmp_path / "example.do"
-    do_file.write_text('label define SC_SEX_lab 1 "Male"\n' 'label define SC_SEX_lab 2 "Female"\n')
+    do_file.write_text('label define SC_SEX_lab 1 "Male"\nlabel define SC_SEX_lab 2 "Female"\n')
 
     result = parse_do(do_file)
 
