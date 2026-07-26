@@ -25,15 +25,33 @@ def parse_do(year_do_path: str | Path) -> DoSpec:
         )
 
     variable_rows: list[dict[str, str]] = []
+    define_rows: list[dict[str, str]] = []
 
     for line in path.read_text().splitlines():
-        match = re.match(r'^\s*label\s+var\s+(\S+)\s+"([^"]*)"', line)
+        variable_match = re.match(
+            r'^\s*label\s+var\s+(\S+)\s+"([^"]*)"',
+            line,
+        )
 
-        if match:
+        if variable_match:
             variable_rows.append(
                 {
-                    "variable": match.group(1),
-                    "desc": match.group(2),
+                    "variable": variable_match.group(1),
+                    "desc": variable_match.group(2),
+                }
+            )
+
+        define_match = re.match(
+            r'^\s*label\s+define\s+(\S+)_lab\s+(\S+)\s+"([^"]*)"',
+            line,
+        )
+
+        if define_match:
+            define_rows.append(
+                {
+                    "variable": define_match.group(1),
+                    "value": define_match.group(2),
+                    "desc": define_match.group(3),
                 }
             )
 
@@ -46,11 +64,12 @@ def parse_do(year_do_path: str | Path) -> DoSpec:
     ).lazy()
 
     define = pl.DataFrame(
+        define_rows,
         schema={
             "variable": pl.String,
             "value": pl.String,
             "desc": pl.String,
-        }
+        },
     ).lazy()
 
     return DoSpec(

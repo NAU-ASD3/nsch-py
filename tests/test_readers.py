@@ -45,3 +45,21 @@ def test_parse_do_parses_variable_labels(tmp_path: Path) -> None:
     )
 
     assert_frame_equal(result.var.collect(), expected)
+
+
+def test_parse_do_parses_value_labels(tmp_path: Path) -> None:
+    """Parse ``label define`` statements from a Stata do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text('label define SC_SEX_lab 1 "Male"\n' 'label define SC_SEX_lab 2 "Female"\n')
+
+    result = parse_do(do_file)
+
+    expected = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX"],
+            "value": ["1", "2"],
+            "desc": ["Male", "Female"],
+        }
+    )
+
+    assert_frame_equal(result.define.collect(), expected)
