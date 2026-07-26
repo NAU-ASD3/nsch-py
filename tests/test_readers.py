@@ -20,7 +20,7 @@ def test_parse_do_raises_error_for_missing_file(tmp_path: Path) -> None:
 
     with pytest.raises(
         FileNotFoundError,
-        match="year.do.path should be the path to a Stata do file",
+        match=r"year\.do\.path should be the path to a Stata do file",
     ):
         parse_do(missing_file)
 
