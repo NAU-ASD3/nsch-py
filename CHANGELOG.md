@@ -10,7 +10,8 @@ so each version stays unique and the date stays honest.
 
 ## 2026.7.24 (PR#60)
 
-- Added `__all__to validate.py` declaring its three public checks
+- Added `__all__` to `validate.py` declaring its three public checks
+
 ## 2026.7.21.1 (PR#43)
 
 - Added `check_label_consistency` for reporting factor-level consistency across years
