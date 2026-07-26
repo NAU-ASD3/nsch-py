@@ -63,3 +63,32 @@ def test_parse_do_parses_value_labels(tmp_path: Path) -> None:
     )
 
     assert_frame_equal(result.define.collect(), expected)
+
+
+def test_parse_do_returns_variable_and_value_labels(tmp_path: Path) -> None:
+    """Return both variable and value-label metadata from one do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label var SC_SEX "Sex of selected child"\n'
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected_var = pl.DataFrame(
+        {
+            "variable": ["SC_SEX"],
+            "desc": ["Sex of selected child"],
+        }
+    )
+    expected_define = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX"],
+            "value": ["1", "2"],
+            "desc": ["Male", "Female"],
+        }
+    )
+
+    assert_frame_equal(result.var.collect(), expected_var)
+    assert_frame_equal(result.define.collect(), expected_define)
