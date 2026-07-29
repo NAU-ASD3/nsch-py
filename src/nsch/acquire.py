@@ -96,8 +96,10 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     year_html = Path(year_url).name
     data_path_year_html = Path(data_path) / year_html
     if not data_path_year_html.exists():
+        if verbose:
+            print(f"Downloading {year_url} -> {data_path}")
         # download the year-specific html page
-        response = requests.get(year_url, timeout=30, verbose=verbose)
+        response = requests.get(year_url, timeout=30)
         response.raise_for_status()
         data_path_year_html.write_bytes(response.content)
     lines = data_path_year_html.read_text(encoding="utf-8").splitlines()
