@@ -9,10 +9,11 @@ match, so the value column and its human-readable labels stay paired.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
-if TYPE_CHECKING:
-    import polars as pl
+import polars as pl
+
+from nsch import _types
 
 __all__ = ["RenameRule", "rename_vars"]
 
@@ -74,11 +75,76 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
 
 
 class MergeRule(TypedDict):
-    """One merge rule: the years it applies to, and the preferred and fallback columns."""
+    """One merge rule with its applicable years and source columns."""
 
     years: list[str]
-    new_name: str
+    column_preferred: str
+    column_fallback: str
 
 
-def merge_vars(lf: pl.LazyFrame, merge: dict[str, MergeRule], year: int) -> pl.LazyFrame:
-    raise NotImplementedError
+def merge_vars(
+    lf: pl.LazyFrame,
+    merge: dict[str, MergeRule],
+    year: int,
+) -> pl.LazyFrame:
+    """Merge preferred and fallback columns for a survey year.
+
+    The preferred column is normally used. The fallback column is used when
+    the preferred value is null or contains the logical skip sentinel, 998.
+
+    If both corresponding ``_label`` columns exist, they are merged using
+    the same preferred-versus-fallback condition.
+
+    Original value and label columns are removed after merging.
+    """
+
+    merged_lf = lf
+    schema = merged_lf.collect_schema()
+    variable_names = set(schema.names())
+
+    for variable_name, details in merge.items():
+        column_preferred = details["column_preferred"]
+        column_fallback = details["column_fallback"]
+        merge_years = details["years"]
+
+        if (
+            str(year) in merge_years
+            and column_preferred in variable_names
+            and column_fallback in variable_names
+        ):
+            preferred_values = pl.col(column_preferred)
+            fallback_values = pl.col(column_fallback)
+
+            logical_skip = _types.TaggedNA.LOGICAL_SKIP
+
+            use_fallback = preferred_values.is_null() | (preferred_values == logical_skip)
+
+            merged_lf = merged_lf.with_columns(
+                pl.when(use_fallback)
+                .then(fallback_values)
+                .otherwise(preferred_values)
+                .cast(pl.Int64)
+                .alias(variable_name)
+            )
+
+            label_preferred = column_preferred + "_label"
+            label_fallback = column_fallback + "_label"
+            label_column = variable_name + "_label"
+
+            if label_preferred in variable_names and label_fallback in variable_names:
+                merged_lf = merged_lf.with_columns(
+                    pl.when(use_fallback)
+                    .then(pl.col(label_fallback))
+                    .otherwise(pl.col(label_preferred))
+                    .alias(label_column)
+                )
+
+            merged_lf = merged_lf.drop(
+                column_preferred,
+                column_fallback,
+                label_preferred,
+                label_fallback,
+                strict=False,
+            )
+
+    return merged_lf
