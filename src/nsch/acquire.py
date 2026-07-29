@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import re
+import zipfile
 from pathlib import Path
 
 import polars as pl
 import requests  # type: ignore
 
-__all__ = ["get_nsch_index"]
-
+__all__ = ["get_all_years", "get_nsch_index", "get_year"]
 
 nsch_url_prefix = "https://www.census.gov/programs-surveys/nsch/data/datasets."
 nsch_data_url = nsch_url_prefix + "html"
@@ -33,6 +33,8 @@ def get_nsch_index(local_html_path: Path) -> pl.DataFrame:
     """
     local_html_path = Path(local_html_path)
     if not local_html_path.exists():
+        # create empty parent directories if they don't exist
+        local_html_path.parent.mkdir(parents=True, exist_ok=True)
         response = requests.get(nsch_data_url, timeout=30)
         response.raise_for_status()
         local_html_path.write_bytes(response.content)
@@ -59,7 +61,8 @@ def get_nsch_index(local_html_path: Path) -> pl.DataFrame:
     return year_dt.unique(maintain_order=True)
 
 
-def get_year(year_url: str, data_path: Path, verbose: bool = False) -> None:
+# TODO: requests_verbose to show download status
+def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     """Download one year of NSCH data
 
     If the input web page does not exist in the data_path
@@ -81,12 +84,56 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> None:
 
     Returns
     -------
-    None, unzips data into the data_path directory
+    Path to the resulting download
 
     """
+    # don't need to check if year_url is char -> python handles this by defining parameter as string
+    # same for data_path and verbose
+
+    data_path = Path(data_path)
+    Path(data_path).mkdir(parents=True, exist_ok=True)
+
+    year_html = Path(year_url).name
+    data_path_year_html = Path(data_path) / year_html
+    if not data_path_year_html.exists():
+        # download the year-specific html page
+        response = requests.get(year_url, timeout=30, verbose=verbose)
+        response.raise_for_status()
+        data_path_year_html.write_bytes(response.content)
+    lines = data_path_year_html.read_text(encoding="utf-8").splitlines()
+    url_df = pl.DataFrame({"line": lines})
+    extracted = url_df.select(
+        pl.col("line")
+        # match protocol-relative "//...topical_Stata.zip"
+        .str.extract(r"(?P<url>(?:https?:)?//[^\s\"'<>]*?topical_Stata\.zip)", 1)
+        .alias("url")
+    ).drop_nulls()
+
+    if extracted.height != 1:
+        raise ValueError(
+            f"expected 1 topical_Stata.zip url on {year_url} but found {extracted.height}"
+        )
+
+    raw_url = extracted[0, "url"]
+    http_url = raw_url if raw_url.startswith("http") else "https:" + raw_url
+
+    year_zip = http_url.split("/")[-1]
+    data_path_year_zip = data_path / year_zip
+
+    if not data_path_year_zip.exists():
+        response = requests.get(http_url, timeout=30)
+        response.raise_for_status()
+        data_path_year_zip.write_bytes(response.content)
+
+    # unzip the downloaded zip file into the data_path directory
+    with zipfile.ZipFile(data_path_year_zip, "r") as zip_ref:
+        zip_ref.extractall(data_path)
+
+    # Return zip file path for testing purposes
+    return Path(data_path_year_zip)
 
 
-def get_all_years(data_path: Path, download: bool) -> None:
+def get_all_years(data_path: Path, download: bool) -> pl.DataFrame:
     r"""Discover NSCH data files for all available years
 
     Finds ``.dta`` and ``.do`` files in a data directory using glob
@@ -110,3 +157,4 @@ def get_all_years(data_path: Path, download: bool) -> None:
     A ``pl.DataFrame`` with columns ``year`` (integer), ``dta_path`` (character),
     and ``do.path``(character).
     """
+    raise NotImplementedError

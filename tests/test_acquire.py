@@ -6,6 +6,9 @@ from pathlib import Path
 
 from nsch.acquire import get_nsch_index
 
+YEAR_URL = "https://www.census.gov/programs-surveys/nsch/data/datasets.2021.html"
+ZIP_URL = "https://www2.census.gov/programs-surveys/nsch/datasets/2021/nsch_2021_topical_Stata.zip"
+
 local_download_path = Path("tests/temp/temp.csv")
 
 
