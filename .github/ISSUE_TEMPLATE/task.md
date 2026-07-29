@@ -29,7 +29,8 @@ assignees: ""
 - [ ] Tests are written first, use synthetic in-memory data, and assert on full columns.
 - [ ] A NumPy-style docstring is present, with a doctest example for anything non-trivial.
 - [ ] `uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy src/` passes locally.
-- [ ] `CHANGELOG.md` has an entry under `[Unreleased]` referencing the PR.
+- [ ] `pyproject.toml` version is bumped to the day the PR lands (`YYYY.M.DD`; add `.1`, `.2`, ... if another PR already landed that day), and `uv.lock` is regenerated with `uv lock`.
+- [ ] `CHANGELOG.md` has a matching `## YYYY.M.DD (PR#NN)` section at the top describing the change.
 
 ## Notes
 
