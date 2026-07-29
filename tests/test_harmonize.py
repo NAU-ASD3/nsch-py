@@ -8,7 +8,13 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.harmonize import TransformValues, subset_vars, transform_values
+from nsch.harmonize import (
+    RenameRule,
+    TransformValues,
+    rename_vars,
+    subset_vars,
+    transform_values,
+)
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -163,3 +169,89 @@ def test_warning_for_missing_desired_subset_variable():
     df = pl.LazyFrame({"a": [1, 2, 3], "a_label": ["x", "y", "z"], "b": [4, 5, 6], "c": [7, 8, 9]})
     with pytest.warns(UserWarning, match="not found"):
         subset_vars(df, ["a", "x"])
+
+
+def test_renames_a_column_for_a_matching_year() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1, 2, 3], "hhid": [10, 20, 30]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}
+    }
+    result = rename_vars(lf, renames, 2023)
+    # The function stays lazy: nothing is collected until the caller asks.
+    assert isinstance(result, pl.LazyFrame)
+    collected = result.collect()
+    assert collected.columns == ["k4q02_r", "hhid"]
+    assert collected["k4q02_r"].to_list() == [1, 2, 3]
+
+
+def test_leaves_columns_unchanged_for_a_nonmatching_year() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1, 2, 3]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}
+    }
+    # 2016 isn't in the rule's years, so the column keeps its source name.
+    result = rename_vars(lf, renames, 2016).collect()
+    assert result.columns == ["gowhensick"]
+
+
+def test_ignores_rules_for_columns_that_are_absent() -> None:
+    lf = pl.LazyFrame({"hhid": [10, 20, 30]})
+    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    result = rename_vars(lf, renames, 2023).collect()
+    assert result.columns == ["hhid"]
+
+
+def test_renames_the_label_companion_too() -> None:
+    lf = pl.LazyFrame({"gowhensick": [4, 8], "gowhensick_label": ["Clinic", "Other"]})
+    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    result = rename_vars(lf, renames, 2023).collect()
+    assert result.columns == ["k4q02_r", "k4q02_r_label"]
+    assert result["k4q02_r_label"].to_list() == ["Clinic", "Other"]
+
+
+def test_applies_several_rules_in_one_call() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2], "hhid": [3]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
+        "family_r": {"years": ["2023"], "new_name": "family"},
+    }
+    result = rename_vars(lf, renames, 2023).collect()
+    expected = pl.DataFrame({"k4q02_r": [1], "family": [2], "hhid": [3]})
+    assert_frame_equal(result, expected)
+
+
+def test_empty_renames_leaves_the_frame_unchanged() -> None:
+    lf = pl.LazyFrame({"hhid": [1, 2]})
+    result = rename_vars(lf, {}, 2023).collect()
+    assert_frame_equal(result, pl.DataFrame({"hhid": [1, 2]}))
+
+
+def test_renames_are_applied_simultaneously_not_chained() -> None:
+    # R renames in a loop, so these two rules cascade there and gowhensick
+    # ends up as k4q02_r. Here both rules read the original names, so each
+    # column moves exactly one step.
+    lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023"], "new_name": "family_r"},
+        "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
+    }
+    result = rename_vars(lf, renames, 2023).collect()
+    expected = pl.DataFrame({"family_r": [1], "k4q02_r": [2]})
+    assert_frame_equal(result, expected)
+
+
+def test_raises_when_two_rules_target_the_same_name() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2]})
+    renames: dict[str, RenameRule] = {
+        "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
+        "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
+    }
+    with pytest.raises(ValueError, match="more than one column"):
+        rename_vars(lf, renames, 2023)
+
+
+def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
+    lf = pl.LazyFrame({"gowhensick": [1], "k4q02_r": [2]})
+    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    with pytest.raises(ValueError, match="existing columns"):
+        rename_vars(lf, renames, 2023)

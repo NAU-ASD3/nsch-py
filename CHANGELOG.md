@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.29.1 (PR#32)
+
+- Added `rename_vars` for per-year column renaming, which also renames the matching `_label` companion column.
+- `rename_vars` raises `ValueError` on colliding rename rules: two rules targeting the same name, or a rule targeting a column that already exists.
+
 ## 2026.7.29 (PR#52)
 
 - Added a project primer to the docs covering the research context, the top-level API, and a glossary of key terms.
