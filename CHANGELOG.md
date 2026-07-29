@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.7.29.2 (PR#60)
+
+- Added `__all__` to `validate.py` declaring its three public checks
+
 ## 2026.7.29.1 (PR#32)
 
 - Added `rename_vars` for per-year column renaming, which also renames the matching `_label` companion column.
