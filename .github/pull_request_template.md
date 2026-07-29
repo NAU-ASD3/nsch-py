@@ -14,8 +14,8 @@ Closes #<!-- issue number -->
 
 - [ ] Tests cover the new function or behavior, use synthetic data, and assert on full columns.
 - [ ] Every new public function has a NumPy-style docstring (with a doctest example where it helps).
-- [ ] `pyproject.toml` version is bumped (`2026.M.DD`).
-- [ ] `CHANGELOG.md` has an entry under `[Unreleased]` referencing this PR.
+- [ ] `pyproject.toml` version is bumped to the day the PR lands (`YYYY.M.DD`; add `.1`, `.2`, ... if another PR already landed that day), and `uv.lock` is regenerated with `uv lock`.
+- [ ] `CHANGELOG.md` has a matching `## YYYY.M.DD (PR#NN)` section at the top describing the change.
 - [ ] `mkdocs.yml` nav is updated if a new public module was added.
 - [ ] The full local check passes: `uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy src/`.
 
