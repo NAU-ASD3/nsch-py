@@ -97,17 +97,36 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
 
     Examples
     --------
+    >>> import numpy as np
     >>> import polars as pl
+    >>> import pyreadstat
+    >>> import tempfile
     >>> from pathlib import Path
-    >>> dta_missing = "tests/data/tagged_missing.dta"
-    >>> dta_path = Path(dta_missing)
-    >>> df = read_nsch_dta(dta_path).collect()
+    >>> with tempfile.TemporaryDirectory() as tmpdir:
+    ...     dta_path = Path(tmpdir) / "tagged_missing.dta"
+    ...     x_col = np.array([1, 2, "m", "n", "l", "d"], dtype=object)
+    ...     df = pl.DataFrame(
+    ...         {
+    ...             "year": [2099] * 6,
+    ...             "x": x_col,
+    ...             "stratum": [1, "2A", "2a", 1, 2, 2],
+    ...         },
+    ...         strict=False,
+    ...     )
+    ...     pyreadstat.write_dta(
+    ...         df,
+    ...         str(dta_path),
+    ...         missing_user_values={"x": ["m", "n", "l", "d"]},
+    ...         variable_value_labels={"x": {1: "Yes", 2: "No"}},
+    ...         variable_format={"year": "int32", "x": "int32", "stratum": "int32"},
+    ...     )
+    ...     df = read_nsch_dta(dta_path).collect()
     >>> print(df)
     shape: (6, 3)
     ┌──────┬─────┬─────────┐
     │ year ┆ x   ┆ stratum │
     │ ---  ┆ --- ┆ ---     │
-    │ i64  ┆ i64 ┆ i64     │
+    │ i64  ┆ i32 ┆ i64     │
     ╞══════╪═════╪═════════╡
     │ 2099 ┆ 1   ┆ 1       │
     │ 2099 ┆ 2   ┆ 2       │
