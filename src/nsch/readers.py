@@ -34,6 +34,7 @@ TAGGED_NA_MAP = {
 
 def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) -> pl.LazyFrame:
     """Helper function for ``read_nsch_dta`` to map each missingness type per column
+    and cast columns to the appropriate ``polars`` eqivalent of their STATA type.
 
     Parameters
     ----------
@@ -142,10 +143,10 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
             f"but this file does not exist: {path}"
         )
     df, meta = pyreadstat.read_dta(str(path), user_missing=True, output_format="polars")
+
     # Cast Object datatypes to string before ganding to _rewrite_tagged_na
     # Polars gets stuck if there are Object types
     object_cols = [c for c in df.columns if df.schema[c] == pl.Object]
-
     df = df.with_columns(
         [
             pl.Series(
