@@ -38,7 +38,7 @@ def test_tagged_nas_are_replaced_with_sentinel_codes() -> None:
             "x": [1, 2, 996, 997, 998, 999],
             "stratum": [1, 2, 2, 1, 2, 2],
         },
-        schema={"year": pl.Int64, "x": pl.Int64, "stratum": pl.Int64},
+        schema={"year": pl.Int64, "x": pl.Int32, "stratum": pl.Int64},
     )
     return assert_frame_equal(df, expected)
 
@@ -49,10 +49,10 @@ def test_all_stata_types_remap_to_polars():
     expected = pl.DataFrame(
         {
             "year": [2099] * 6,
-            "x": [1, 2, 996, 997, 998, 999],
+            "x": [1.5, 2.0, 996, 997, 998, 999],
             "y": ["a", "b", "c", "e", "f", "g"],
             "stratum": [1, 2, 2, 1, 2, 2],
         },
-        schema={"year": pl.Int64, "x": pl.Int64, "y": pl.Utf8, "stratum": pl.Int64},
+        schema={"year": pl.Int64, "x": pl.Float64, "y": pl.Utf8, "stratum": pl.Int64},
     )
     return assert_frame_equal(df, expected)
