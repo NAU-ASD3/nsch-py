@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import polars as pl
 
+__all__ = ["check_label_consistency", "check_na_rates", "check_year_coverage"]
+
 
 def check_label_consistency(df: pl.DataFrame) -> pl.DataFrame:
     """Report whether each Enum column's levels stay the same across years.
