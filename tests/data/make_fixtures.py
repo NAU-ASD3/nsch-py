@@ -51,7 +51,7 @@ def create_mixed_types_dta() -> None:
         df,
         "tests/data/mixed_types.dta",
         missing_user_values={"x": ["m", "n", "l", "d"]},
-        variable_value_labels={"x": {1: "Yes", 2: "No"}},
+        variable_value_labels={"x": {1.5: "Yes", 2.0: "No"}},
         variable_format={"year": "float", "x": "float", "y": "str", "stratum": "int32"},
     )
 
