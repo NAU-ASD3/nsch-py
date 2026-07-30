@@ -22,7 +22,6 @@ READSTAT_TO_POLARS = {
     "int16": pl.Int16,
     "int8": pl.Int8,
     "string": pl.Utf8,
-    "object": pl.Utf8,
 }
 
 TAGGED_NA_MAP = {
@@ -41,7 +40,7 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
     lf : pl.LazyFrame
         The input LazyFrame, read from the STATA file in ``read_nsch_dta``.
     meta : pyreadstat.metadata_container
-        A container holding the metatdata of the STATA file read in ``read_nsch_dta``
+        A container holding the metadata of the STATA file read in ``read_nsch_dta``
         containing the STATA missing user values to use for tagged missingness mapping.
 
     Returns
@@ -73,10 +72,10 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
 
 def read_nsch_dta(path: Path) -> pl.LazyFrame:
     """Reads a single NSCH Stata ``dta`` file and returns a ``pl.LazyFrame``
-    with polars numeric and charachter columns.
+    with polars numeric and character columns.
 
     Performs three cleaning steps during ingestion:
-    1. Replaces Stata tagged ``NA`` values (``.m``, ``.n``, ``.l``, ``.d}``)
+    1. Replaces Stata tagged ``NA`` values (``.m``, ``.n``, ``.l``, ``.d``)
         with integer sentinel codes using the ``Tagged_NA`` class in ``_types.py``
     2. Replaces STATA types for each column with their corresponding ``polars``
         type.
@@ -149,9 +148,22 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
 
     # Normalize stratum column: some years have "2A" which must become
     # numeric 2 for consistency.
+    schema = lf.collect_schema()
+    # Next grabs the first stratum column it sees instead of building the whole column list
+    # .lower protects against inconsitant capitalization but not other naming inconsistancies
+    stratum_col = next((c for c in schema.names() if c.lower() == "stratum"), None)
+
+    if stratum_col is None:
+        raise ValueError("No stratum column found")
+
+    # Make sure str.replace only runs on columns that are already string types
+    stratum_expr = (
+        pl.col(stratum_col).str.replace(r"^2[aA]?$", "2").cast(pl.Int64)
+        if stratum_col is not None and schema[stratum_col] == pl.String
+        else pl.col(stratum_col).cast(pl.Int64)
+    )
+
     return lf.with_columns(
-        pl.col("stratum")
-        .str.replace(r"^2[aA]?$", "2")
-        .cast(pl.Int64),  # TODO: str replace stratum only if it is already a string
+        stratum_expr.alias("stratum"),
         pl.col("year").cast(pl.Int64),
     )

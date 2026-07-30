@@ -18,7 +18,7 @@ def create_tagged_missing_dta() -> None:
         {
             "year": [2099] * 6,
             "x": x_col,
-            "stratum": [1, 2, "2A", 1, 2, 2],
+            "stratum": [1, 2, 2, 1, 2, 2],
         },
         strict=False,
     )
@@ -56,5 +56,29 @@ def create_mixed_types_dta() -> None:
     )
 
 
+def create_no_stratum_data() -> None:
+    # Creates a dataset with mix of floats, string, and integer values
+    x_col = np.array([1.5, 2.0, "m", "n", "l", "d"], dtype=object)
+
+    df = pl.DataFrame(
+        {
+            "year": [2099] * 6,
+            "x": x_col,
+            # d is a tagged stata type, so skip it
+            "y": ["a", "b", "c", "e", "f", "g"],
+        },
+        strict=False,
+    )
+
+    pyreadstat.write_dta(
+        df,
+        "tests/data/no_stratum.dta",
+        missing_user_values={"x": ["m", "n", "l", "d"]},
+        variable_value_labels={"x": {1.5: "Yes", 2.0: "No"}},
+        variable_format={"year": "float", "x": "float", "y": "str", "stratum": "int32"},
+    )
+
+
 create_tagged_missing_dta()
 create_mixed_types_dta()
+create_no_stratum_data()

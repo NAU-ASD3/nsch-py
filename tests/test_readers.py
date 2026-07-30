@@ -12,6 +12,7 @@ from nsch.readers import read_nsch_dta
 
 dta_missing = Path("tests/data/tagged_missing.dta")
 dta_mixed = Path("tests/data/mixed_types.dta")
+dta_no_stratum = Path("tests/data/no_stratum.dta")
 
 
 def test_return_is_a_lazy_frame() -> None:
@@ -23,13 +24,14 @@ def test_year_column_is_an_integer() -> None:
     assert isinstance(result.collect_schema()["year"], pl.Int64)
 
 
-def test_missing_file_throws_informative_error():
+def test_missing_file_throws_informative_error() -> None:
     does_not_exist = Path("does_not_exist.dta")
     with pytest.raises(FileNotFoundError, match="does not exist"):
         read_nsch_dta(does_not_exist)
 
 
 # Test nulls are remapped with sentinels, also asserts stratum is an integer
+# Also checks a fully integer stratum column passes
 def test_tagged_nas_are_replaced_with_sentinel_codes() -> None:
     df = read_nsch_dta(dta_missing).collect()
     expected = pl.DataFrame(
@@ -40,11 +42,11 @@ def test_tagged_nas_are_replaced_with_sentinel_codes() -> None:
         },
         schema={"year": pl.Int64, "x": pl.Int32, "stratum": pl.Int64},
     )
-    return assert_frame_equal(df, expected)
+    assert_frame_equal(df, expected)
 
 
 # all datatypes have been remapped from stata to their corresponding polars type
-def test_all_stata_types_remap_to_polars():
+def test_all_stata_types_remap_to_polars() -> None:
     df = read_nsch_dta(dta_mixed).collect()
     expected = pl.DataFrame(
         {
@@ -55,4 +57,9 @@ def test_all_stata_types_remap_to_polars():
         },
         schema={"year": pl.Int64, "x": pl.Float64, "y": pl.Utf8, "stratum": pl.Int64},
     )
-    return assert_frame_equal(df, expected)
+    assert_frame_equal(df, expected)
+
+
+def test_raises_error_if_stratum_col_missing() -> None:
+    with pytest.raises(ValueError, match="No stratum"):
+        read_nsch_dta(dta_no_stratum).collect()
