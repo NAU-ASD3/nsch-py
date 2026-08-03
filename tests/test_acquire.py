@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import io
-import shutil
 import zipfile
-from pathlib import Path
 
 import polars as pl
 import pytest
@@ -15,14 +13,6 @@ from nsch.acquire import get_all_years, get_nsch_index, get_year
 
 YEAR_URL = "https://www.census.gov/programs-surveys/nsch/data/datasets.2021.html"
 ZIP_URL = "https://www2.census.gov/programs-surveys/nsch/datasets/2021/mock_2021_topical_Stata.zip"
-
-
-@pytest.fixture(autouse=True)  # If true, runs automatically after every test
-def clean_test_dir():
-    d = Path("tests/temp")
-    d.mkdir(parents=True, exist_ok=True)
-    yield
-    shutil.rmtree(d, ignore_errors=True)  # Ignore errors ignores if a test fails
 
 
 def test_get_nsch_index_creates_index_file(tmp_path) -> None:

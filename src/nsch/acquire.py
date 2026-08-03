@@ -157,7 +157,7 @@ def get_all_years(
     Returns
     -------
     A ``pl.DataFrame`` with columns ``year`` (integer), ``dta_path`` (character),
-    and ``do.path``(character).
+    and ``do_path``(character).
     """
     if download:
         # Get list of files from index
@@ -165,7 +165,7 @@ def get_all_years(
         if years is not None and len(years) > 0:
             index_df = index_df.filter(pl.col("year").is_in(years))
         # use get_year to download each file from the webpage
-        for i in range(1, index_df.height + 1):
+        for i in range(0, index_df.height):
             get_year(index_df["url"][i], data_path=data_path)
 
     # Discover .dta and .do files, glob handles 2024's nsch_2024e_topical.dta.
@@ -199,6 +199,6 @@ def get_all_years(
         years_int = [int(y) for y in years]
         joined_dta_do = joined_dta_do.filter(pl.col("year").is_in(years_int))
     if joined_dta_do.height == 0:
-        raise ValueError("No matching \\.dta files found for the requested years")
+        raise ValueError(r"No matching .dta files found for the requested years")
 
     return joined_dta_do
