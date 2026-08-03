@@ -16,21 +16,25 @@ from nsch.acquire import get_all_years, get_nsch_index, get_year
 YEAR_URL = "https://www.census.gov/programs-surveys/nsch/data/datasets.2021.html"
 ZIP_URL = "https://www2.census.gov/programs-surveys/nsch/datasets/2021/mock_2021_topical_Stata.zip"
 
-local_download_path = Path("tests/temp/temp.csv")
+
+@pytest.fixture(autouse=True)  # If true, runs automatically after every test
+def clean_test_dir():
+    d = Path("tests/temp")
+    d.mkdir(parents=True, exist_ok=True)
+    yield
+    shutil.rmtree(d, ignore_errors=True)  # Ignore errors ignores if a test fails
 
 
-def test_get_nsch_index_creates_index_file() -> None:
-    if local_download_path.exists():
-        # Clear temp path to restart from clean
-        local_download_path.unlink()
-    get_nsch_index(local_html_path=local_download_path)
-    assert local_download_path.exists()
+def test_get_nsch_index_creates_index_file(tmp_path) -> None:
+    html_path = tmp_path / "index.html"
+    get_nsch_index(local_html_path=html_path)
+    assert html_path.exists()
 
 
-def test_get_nsch_index_returns_list_of_years_after_2016() -> None:
-    result = get_nsch_index(local_html_path=local_download_path)
+def test_get_nsch_index_returns_list_of_years_after_2016(tmp_path) -> None:
+    html_path = tmp_path / "index.html"
+    result = get_nsch_index(local_html_path=html_path)
     assert (result["year"] >= 2016).all()
-    # assert year column contains no duplicates
     assert result["year"].is_unique().all()
 
 
@@ -90,14 +94,6 @@ def test_get_year_raises_http_error_on_bad_status(tmp_path, requests_mock) -> No
 
     with pytest.raises(requests.exceptions.HTTPError):
         get_year(YEAR_URL, tmp_path)
-
-
-@pytest.fixture(autouse=True)
-def clean_test_dir():
-    d = Path("tests/temp")
-    d.mkdir(parents=True, exist_ok=True)
-    yield
-    shutil.rmtree(d, ignore_errors=True)
 
 
 def test_discovers_dta_and_do_files_with_standard_naming(tmp_path) -> None:
