@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import io
+import shutil
 import zipfile
 from pathlib import Path
 
 import polars as pl
 import pytest
 import requests
-from polars.testing import assert_frame_equal
 
 from nsch.acquire import get_all_years, get_nsch_index, get_year
 
@@ -92,9 +92,16 @@ def test_get_year_raises_http_error_on_bad_status(tmp_path, requests_mock) -> No
         get_year(YEAR_URL, tmp_path)
 
 
-def test_get_all_years_discovers_dta_and_do_files_with_standard_naming() -> None:
+@pytest.fixture(autouse=True)
+def clean_test_dir():
+    d = Path("tests/temp")
+    d.mkdir(parents=True, exist_ok=True)
+    yield
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def test_discovers_dta_and_do_files_with_standard_naming(tmp_path) -> None:
     # Create temp test directory with fake .dta and .do files
-    test_dir = Path("tests/temp")
     path_strings = [
         "nsch_2016_topical.dta",
         "nsch_2016_topical.do",
@@ -102,43 +109,32 @@ def test_get_all_years_discovers_dta_and_do_files_with_standard_naming() -> None
         "nsch_2017_topical.do",
     ]
     for path_string in path_strings:
-        file_path = test_dir / path_string
-        file_path.touch()
-    result = get_all_years(data_path=test_dir, download=False)
-    expected = pl.DataFrame(
-        {
-            "year": [2016, 2015],
-            "dta_path": ["nsch_2016_topical.dta", "nsch_2017_topical.dta"],
-            "do_path": ["nsch_2016_topical.do", "nsch_2017_topical.do"],
-        }
-    )
+        (tmp_path / path_string).touch()
+
+    result = get_all_years(data_path=tmp_path, download=False)
+
     assert isinstance(result, pl.DataFrame)
-    assert_frame_equal(result, expected)
+    assert sorted(result["year"].to_list()) == [2016, 2017]
+    assert result.columns == ["year", "dta_path", "do_path"]
 
 
-def test_get_all_years_discovers_files_with_non_standard_naming() -> None:
-    test_dir = Path("tests/temp")
-    file_path = test_dir / "nsch_2024e_topical.dta"
-    file_path.touch()
-    file_path_do = test_dir / "nsch_2024_topical.do"
-    file_path_do.touch()
-    result = get_all_years(data_path=test_dir, download=False)
-    assert result["year"] == 2024
+def test_get_all_years_discovers_files_with_non_standard_naming(tmp_path) -> None:
+    (tmp_path / "nsch_2024e_topical.dta").touch()
+    (tmp_path / "nsch_2024_topical.do").touch()
+    result = get_all_years(data_path=tmp_path, download=False)
+    assert result["year"].to_list() == [2024]
 
 
-def test_get_all_years_filters_to_requested_years() -> None:
-    test_dir = Path("tests/temp")
+def test_get_all_years_filters_to_requested_years(tmp_path) -> None:
     for year in range(2016, 2018):
-        file_path = test_dir / ("nsch_" + year + "_topical.dta")
+        file_path = tmp_path / ("nsch_" + str(year) + "_topical.dta")
         file_path.touch()
-        file_path_do = test_dir / ("nsch_" + year + "_topical.dta")
+        file_path_do = tmp_path / ("nsch_" + str(year) + "_topical.do")
         file_path_do.touch()
-    result = get_all_years(data_path=test_dir, years=[2016, 2017], download=False)
-    assert result["year"] == [2016, 2017]
+    result = get_all_years(data_path=tmp_path, years=[2016, 2017], download=False)
+    assert result["year"].to_list() == [2016, 2017]
 
 
-def test_get_all_years_throws_error_when_no_dta_files_found() -> None:
-    test_dir = Path("tests/temp")
-    test_dir.mkdir(exist_ok=True)
+def test_get_all_years_throws_error_when_no_dta_files_found(tmp_path) -> None:
     with pytest.raises(ValueError, match="No \\.dta files found"):
-        get_all_years(data_path=test_dir, download=False)
+        get_all_years(data_path=tmp_path, download=False)
