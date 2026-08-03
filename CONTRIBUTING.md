@@ -81,7 +81,9 @@ def test_values_are_remapped_for_matching_year():
     transforms = {
         "k2q01_d": {
             "years": ["2016", "2017"],
-            "value": ["2"], "new_value": ["1"], "new_label": ["Yes"],
+            "value": ["2"],
+            "new_value": ["1"],
+            "new_label": ["Yes"],
         }
     }
     result = transform_values(lf, transforms, 2016).collect()

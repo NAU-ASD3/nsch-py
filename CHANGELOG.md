@@ -8,11 +8,29 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.8.3 (PR#NN)
+## 2026.8.3 (PR#66)
 
 - Added `get_nsch_index` for readin NSCH index page and getting links to each dataset
 - Added `get_year` to read one year's NSCH STATA `.dta` and `.do` files
 - Added `get_all_years` to create a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
+
+## 2026.7.29.3 (PR#55)
+
+- Added a Version 0 runbook documenting the workflow for adding a new NSCH survey year, covering variable configuration, transforms, renames, merges, and validation.
+
+## 2026.7.29.2 (PR#60)
+
+- Added `__all__` to `validate.py` declaring its three public checks
+
+## 2026.7.29.1 (PR#32)
+
+- Added `rename_vars` for per-year column renaming, which also renames the matching `_label` companion column.
+- `rename_vars` raises `ValueError` on colliding rename rules: two rules targeting the same name, or a rule targeting a column that already exists.
+
+## 2026.7.29 (PR#52)
+
+- Added a project primer to the docs covering the research context, the top-level API, and a glossary of key terms.
+- Aligned the PR and issue templates with the dated changelog convention (closes #58).
 
 ## 2026.7.21.1 (PR#43)
 
