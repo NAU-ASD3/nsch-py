@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 import polars as pl
-import requests  # type: ignore
+import requests
 
 __all__ = ["get_all_years", "get_nsch_index", "get_year"]
 
@@ -61,7 +61,6 @@ def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
     return year_dt.unique(maintain_order=True)
 
 
-# TODO: requests_verbose to show download status
 def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     """Download one year of NSCH data
 
@@ -87,9 +86,8 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     Path to the resulting download
 
     """
-    # don't need to check if year_url is char -> python handles this by defining parameter as string
+    # don't need to check if year_url is string, python handles this by defining parameter as string
     # same for data_path and verbose
-
     data_path = Path(data_path)
     Path(data_path).mkdir(parents=True, exist_ok=True)
 
@@ -186,8 +184,8 @@ def get_all_years(
                 raise ValueError(f"Could not extract a 4-digit year from filename: {f.name}")
             file_years.append(int(match.group()))
         col_name = f"{suffix}_path"
-
         df_dict[suffix] = pl.DataFrame({"year": file_years, col_name: [str(f) for f in files]})
+
     joined_dta_do = (
         df_dict["dta"]
         .join(df_dict["do"], on="year", how="full", coalesce=True, validate="1:1")
