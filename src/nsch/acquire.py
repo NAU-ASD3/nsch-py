@@ -15,7 +15,7 @@ nsch_url_prefix = "https://www.census.gov/programs-surveys/nsch/data/datasets."
 nsch_data_url = nsch_url_prefix + "html"
 
 
-def get_nsch_index(local_html_path: Path) -> pl.DataFrame:
+def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
     """
     Download and parse the NSCH index web page to obtain a list
     of years for which survey data are available.
@@ -135,8 +135,10 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     return Path(data_path_year_zip)
 
 
-def get_all_years(data_path: Path, download: bool) -> pl.DataFrame:
-    r"""Discover NSCH data files for all available years
+def get_all_years(
+    data_path: Path, years: list[int] | None = None, download: bool = True
+) -> pl.DataFrame:
+    """Discover NSCH data files for all available years
 
     Finds ``.dta`` and ``.do`` files in a data directory using glob
     patterns, returning a ``pl.DataFrame`` mapping each year to its
@@ -146,9 +148,9 @@ def get_all_years(data_path: Path, download: bool) -> pl.DataFrame:
     Parameters
     ----------
     data_path: Path
-        Directory containing NSCH \code{.dta} and \code{.do} files.}
+        Directory containing NSCH ``.dta`` and ``.do`` files.
     years: int
-        Optional integer vector of years to include.
+        Optional integer list of years to include.
         If ``None``, all discovered years are returned.
     download: bool
         If ``True``, downloads data via ``get_year`` before discovering files.
@@ -159,4 +161,46 @@ def get_all_years(data_path: Path, download: bool) -> pl.DataFrame:
     A ``pl.DataFrame`` with columns ``year`` (integer), ``dta_path`` (character),
     and ``do.path``(character).
     """
-    raise NotImplementedError
+    if download:
+        # Get list of files from index
+        index_df = get_nsch_index()
+        if years is not None and len(years) > 0:
+            index_df = index_df.filter(pl.col("year").is_in(years))
+        # use get_year to download each file from the webpage
+        for i in range(1, index_df.height + 1):
+            get_year(index_df["url"][i], data_path=data_path)
+
+    # Discover .dta and .do files, glob handles 2024's nsch_2024e_topical.dta.
+    df_dict = {}
+    for suffix in ["dta", "do"]:
+        files = list(Path(data_path).glob(f"*topical*.{suffix}"))
+        if len(files) == 0:
+            raise ValueError(f"No .{suffix} files found in data path: {data_path}")
+
+        # Extract the 4-digit year from each filename.
+        # Raises ValueError if no year found (match is None)
+        file_years = []
+        for f in files:
+            match = re.search(r"[0-9]{4}", f.name)
+            if match is None:
+                raise ValueError(f"Could not extract a 4-digit year from filename: {f.name}")
+            file_years.append(int(match.group()))
+        col_name = f"{suffix}_path"
+
+        df_dict[suffix] = pl.DataFrame({"year": file_years, col_name: [str(f) for f in files]})
+    joined_dta_do = (
+        df_dict["dta"]
+        .join(df_dict["do"], on="year", how="full", coalesce=True, validate="1:1")
+        .sort("year")
+    )
+    # Make sure we have .do files for every .dta and vice versa
+    missing = joined_dta_do.filter(pl.col("dta_path").is_null() | pl.col("do_path").is_null())
+    if missing.height > 0:
+        raise ValueError(f"Mismatched .dta/.do files for years: {missing['year'].to_list()}")
+    if years is not None:
+        years_int = [int(y) for y in years]
+        joined_dta_do = joined_dta_do.filter(pl.col("year").is_in(years_int))
+    if joined_dta_do.height == 0:
+        raise ValueError("No matching \\.dta files found for the requested years")
+
+    return joined_dta_do
