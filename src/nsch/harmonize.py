@@ -1,11 +1,4 @@
-"""Per-year column renaming for the harmonize stage.
-
-``rename_vars`` applies the rename rules for one survey year, turning that
-year's source column names into the harmonized names the rest of the pipeline
-expects. It stays lazy: a LazyFrame goes in and a LazyFrame comes out, with no
-collection. When a column is renamed, its ``_label`` companion is renamed to
-match, so the value column and its human-readable labels stay paired.
-"""
+"""Functions for the Harmonize module"""
 
 from __future__ import annotations
 
@@ -15,7 +8,7 @@ import polars as pl
 
 from nsch import _types
 
-__all__ = ["RenameRule", "rename_vars"]
+__all__ = ["MergeRule", "RenameRule", "merge_vars", "rename_vars"]
 
 
 class RenameRule(TypedDict):
@@ -25,8 +18,22 @@ class RenameRule(TypedDict):
     new_name: str
 
 
+class MergeRule(TypedDict):
+    """One merge rule with its applicable years and source columns."""
+
+    years: list[str]
+    column_preferred: str
+    column_fallback: str
+
+
 def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> pl.LazyFrame:
     """Rename columns for one survey year according to the rename rules.
+
+    Applies the rename rules for one survey year, turning that
+    year's source column names into the harmonized names the rest of the pipeline
+    expects. It stays lazy: a LazyFrame goes in and a LazyFrame comes out, with no
+    collection. When a column is renamed, its ``_label`` companion is renamed to
+    match, so the value column and its human-readable labels stay paired.
 
     Parameters
     ----------
@@ -69,17 +76,6 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
         if old_label in present:
             mapping[old_label] = f"{new_name}_label"
     return lf.rename(mapping)
-
-
-# Merge Preferred Columns
-
-
-class MergeRule(TypedDict):
-    """One merge rule with its applicable years and source columns."""
-
-    years: list[str]
-    column_preferred: str
-    column_fallback: str
 
 
 def merge_vars(
