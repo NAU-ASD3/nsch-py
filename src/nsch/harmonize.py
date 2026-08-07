@@ -136,9 +136,7 @@ def merge_vars(
                 )
 
             merged_lf = merged_lf.drop(
-                column_preferred,
                 column_fallback,
-                label_preferred,
                 label_fallback,
                 strict=False,
             )

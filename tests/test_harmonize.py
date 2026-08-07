@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from nsch.harmonize import MergeRule, RenameRule, merge_vars, rename_vars
 
@@ -65,10 +66,17 @@ def test_merges_preferrd_colums() -> None:
         }
     }
     # Create a pl.DataFrame called "expected" that contains what our result should look like
+
+    expected = pl.DataFrame(
+        {
+            "k4q02_r": [3, 4],
+            "hhid": [5, 6],
+        }
+    )
     result = merge_vars(lf, merge, 2023).collect()
-    # Assert using assert_frame_equal(expected, result) instead of the two assert statements below
-    assert result.columns == ["k4q02_r", "hhid"]
-    assert result["k4q02_r"].to_list() == [1, 2]
+    assert_frame_equal(result, expected)
+
+    print(result)
 
 
 # Test label columns are also merged
