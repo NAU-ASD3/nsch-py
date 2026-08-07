@@ -54,39 +54,73 @@ def test_applies_several_rules_in_one_call() -> None:
 
 
 # Tests for merge_vars
-# After writing each test, we can use uv run pytest tests/test_harmonize.py
-# TODO: Convert to use assert_frame_equal
-def test_merges_preferrd_colums() -> None:
-    lf = pl.LazyFrame({"gowhensick": [1, 2], "k4q02_r": [3, 4], "hhid": [5, 6]})
-    merge: dict[str, MergeRule] = {
-        "gowhensick": {
+
+
+def test_merges_preferred_colums() -> None:
+    lf = pl.LazyFrame(
+        {"gowhensick": [1, 2, 3, 4], "k4q02_r": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
+    )
+    merges: dict[str, MergeRule] = {
+        "gowhensick_merged": {
             "years": ["2023"],
             "column_preferred": "k4q02_r",
             "column_fallback": "gowhensick",
         }
     }
     # Create a pl.DataFrame called "expected" that contains what our result should look like
-
     expected = pl.DataFrame(
         {
-            "k4q02_r": [3, 4],
-            "hhid": [5, 6],
+            "hhid": [5, 6, 7, 8],
+            "gowhensick_merged": [1, 2, 3, 4],
         }
     )
-    result = merge_vars(lf, merge, 2023).collect()
-    assert_frame_equal(result, expected)
-
-    print(result)
+    result = merge_vars(lf, merges, 2023).collect()
+    # Assert on full frame
+    assert_frame_equal(expected, result)
 
 
 # Test label columns are also merged
+def test_merges_label_columns() -> None:
+    lf = pl.LazyFrame(
+        {"a": [1, None], "b": [None, 2], "a_label": ["One", None], "b_label": [None, "Two"]}
+    )
+    merges: dict[str, MergeRule] = {
+        "merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}
+    }
 
-# Test no merge for a non-matching year -> merge_vars input year does not match MergeRule years
+    expected = pl.DataFrame({"merged": [1, 2], "merged_label": ["One", "Two"]})
+    result = merge_vars(lf, merges, 2016).collect()
+    assert_frame_equal(expected, result)
+
+
+# Test label column stays in sync when logical skip triggers the use of the fallback value
+# Test logical skip 998 in the preferred column uses the fallback value
+def test_logical_skip_uses_fallback_in_preferred_and_label_columns() -> None:
+    lf = pl.LazyFrame(
+        {
+            "a": [1, 998, 998],
+            "b": [None, 2, None],
+            "a_label": ["One", None, None],
+            "b_label": [None, "Two", None],
+        }
+    )
+    merges: dict[str, MergeRule] = {
+        "merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}
+    }
+    result = merge_vars(lf, merges, 2016).collect()
+    expected = pl.DataFrame({"merged": [1, 2, None], "merged_label": ["One", "Two", None]})
+    assert_frame_equal(result, expected)
+
 
 # Test missing source columns are silently skipped
+#   define function
+#   create a LazyFrame to test
+#   create a merges dictionary with column_preferred and column_fallback values
+#   that are different from the column in the test lazy frame
+#   call merge_vars to get the result
+#   assert the result lazyframe is the same as the test lazyframe
 
-# Test logical skip 998 in the preferred column uses the fallback value
 
 # Test non-logical skip values (sentinals that are not 998) do NOT use the fallback value
 
-# Test label column stays in sync when logical skip triggers the use of the fallback value
+# Test no merge for a non-matching year -> when merge_vars input year does not match MergeRule years

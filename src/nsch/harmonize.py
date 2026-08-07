@@ -80,7 +80,7 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
 
 def merge_vars(
     lf: pl.LazyFrame,
-    merge: dict[str, MergeRule],
+    merges: dict[str, MergeRule],
     year: int,
 ) -> pl.LazyFrame:
     """Merge preferred and fallback columns for a survey year.
@@ -98,7 +98,7 @@ def merge_vars(
     schema = merged_lf.collect_schema()
     variable_names = set(schema.names())
 
-    for variable_name, details in merge.items():
+    for merged_variable_name, details in merges.items():
         column_preferred = details["column_preferred"]
         column_fallback = details["column_fallback"]
         merge_years = details["years"]
@@ -111,21 +111,21 @@ def merge_vars(
             preferred_values = pl.col(column_preferred)
             fallback_values = pl.col(column_fallback)
 
-            logical_skip = _types.TaggedNA.LOGICAL_SKIP
-
-            use_fallback = preferred_values.is_null() | (preferred_values == logical_skip)
+            use_fallback = (preferred_values.is_null()) | (
+                preferred_values == _types.TaggedNA.LOGICAL_SKIP
+            )
 
             merged_lf = merged_lf.with_columns(
                 pl.when(use_fallback)
                 .then(fallback_values)
                 .otherwise(preferred_values)
-                .cast(pl.Int64)
-                .alias(variable_name)
+                .cast(schema[column_preferred])  # Might be fragile
+                .alias(merged_variable_name)
             )
 
             label_preferred = column_preferred + "_label"
             label_fallback = column_fallback + "_label"
-            label_column = variable_name + "_label"
+            label_column = merged_variable_name + "_label"
 
             if label_preferred in variable_names and label_fallback in variable_names:
                 merged_lf = merged_lf.with_columns(
@@ -137,7 +137,9 @@ def merge_vars(
 
             merged_lf = merged_lf.drop(
                 column_fallback,
+                column_preferred,
                 label_fallback,
+                label_preferred,
                 strict=False,
             )
 
