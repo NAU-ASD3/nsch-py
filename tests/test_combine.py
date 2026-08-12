@@ -7,6 +7,10 @@ from polars.testing import assert_frame_equal, assert_series_equal
 
 from nsch.combine import apply_do_labels
 
+# NOTE: Tagged missing values are just the raw letter rather than with the leading.
+# because this is how pyreadstat.read_dta() will read them in. Worth checking against the
+# result of parse_do
+
 
 def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
     lf = pl.LazyFrame({"sc_sex": [1, 2, 1, 2]})
@@ -50,7 +54,9 @@ def test_sentinel_codes_all_map_to_None() -> None:
         }
     )
     result = apply_do_labels(lf, define_lf).collect()
-    expected = pl.Series("sc_sex", ["Male", None, None, None, None], dtype=pl.Enum(["Male"]))
+    expected = pl.Series(
+        "sc_sex", ["Male", None, None, None, None], dtype=pl.Enum(["Male", "Female"])
+    )
     assert_series_equal(result["sc_sex"], expected)
 
 
@@ -59,7 +65,7 @@ def test_label_column_takes_priority_over_do_derived_labels() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["birthwt"] * 6,
-            "value": ["1", "2", "3", ".m", ".n", ".d"],
+            "value": ["1", "2", "3", "m", "n", "d"],
             "desc": [
                 "Very low birth weight",
                 "Low birth weight",
