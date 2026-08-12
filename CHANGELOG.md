@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.8.11 (PR#NN)
+
+- Added `apply_do_labels` for converting integer values to `pl.Enum` data types based on the `DoSpec` from `parse_do`. Also converts all remaining sentinels to `None`.
+
 ## 2026.7.26 (PR#61)
 
 - Added `parse_do` for reading NSCH Stata `.do` files and introduced the `DoSpec` type for parsed variable and value labels.
