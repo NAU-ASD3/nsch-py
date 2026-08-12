@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import polars as pl
 
-if TYPE_CHECKING:
-    import polars as pl
+from nsch._types import TaggedNA
 
 __all__ = ["apply_do_labels"]
 
 
 def apply_do_labels(
-    lf: pl.LazyFrame, define_lf: pl.DataFrame, alias: dict[str, str] | None = None
+    lf: pl.LazyFrame, define_lf: pl.LazyFrame, alias: dict[str, str] | None = None
 ) -> pl.LazyFrame:
     """Converts numeric columns in a ``pl.LazyFrame`` to the ``Polars`` Enum dtype using
     label definitions ``define`` table in the ``DoSpec`` from ``parse_do()``. For each variable
@@ -52,5 +51,111 @@ def apply_do_labels(
     Examples
     --------
     """
+    sentinel_codes = [tag.value for tag in TaggedNA]
+    missing_values = ["m", "n", "l", "d"]  # Need a better way than hardcoding this maybe
 
-    raise NotImplementedError
+    schema = lf.collect_schema()
+    lf_vars = schema.names()
+
+    define_df = define_lf.collect()
+
+    # Make alias an empty dict if it does not exist (is None)
+    alias = alias or {}
+
+    # Get the values form the .do define tables that are not NA tags
+    # Use ~ to negate element-wise and not on the series whose truth value is ambiguous
+    # Sorts to mirror the ordered factor levels in R
+    real_defs = (
+        define_df.filter(~pl.col("value").is_in(missing_values))
+        .with_columns(pl.col("value").cast(pl.Float64).alias("_num"))
+        .sort("_num")
+    )
+
+    # ordered dict-map where insertion order == numeric sort order from the above sort,
+    # which becomes the Enum's category order
+    value_maps: dict[str, dict[float, str]] = {
+        variable: dict(zip(group["_num"], group["desc"], strict=False))
+        for (variable,), group in real_defs.group_by("variable", maintain_order=True)
+    }
+
+    lf_var_set = set(lf_vars)
+
+    # Map column name and label to lookup_name if lookup_name exists and has real values
+    # combines the defined_vars + value_maps checks
+    mapped_cols: list[tuple[str, str | None, dict[float, str]]] = []
+    plain_numeric_cols: list[str] = []
+
+    for col in lf_vars:
+        if col.endswith("_label"):
+            continue
+        # If col is found in alias, return its value. Otherwise return the original column name
+        lookup_name = alias.get(col, col)
+        mapping = value_maps.get(lookup_name)
+
+        if mapping:
+            label_col: str | None = f"{col}_label" if f"{col}_label" in lf_var_set else None
+            mapped_cols.append((col, label_col, mapping))
+        elif schema[col].is_numeric():
+            plain_numeric_cols.append(col)
+
+    # Scan the data once for override label values actually present in each _label column,
+    # so a label introduced only via override rather than in the .do will still mapt to a
+    # valid Enum category.
+    override_label_cols = [lc for _, lc, _ in mapped_cols if lc]
+    override_values: dict[str, set[str]] = {}
+    if override_label_cols:
+        distinct_df = lf.select(
+            pl.col(lc).drop_nulls().unique() for lc in override_label_cols
+        ).collect()
+        override_values = {lc: set(distinct_df[lc].to_list()) for lc in override_label_cols}
+
+    exprs: list[pl.Expr] = []
+    label_cols_to_drop: list[str] = []
+
+    for col, label_col, mapping in mapped_cols:
+        col_dtype = schema[col]
+
+        # convert mapping to float rather than whole column
+        col_mapping: dict[int, str] | dict[float, str]
+        if col_dtype.is_integer():
+            col_mapping = {int(k): v for k, v in mapping.items() if float(k).is_integer()}
+        else:
+            col_mapping = mapping
+
+        # Enum categories are built from the full .do-defined label set to mirror R's factor.levels
+        categories = list(mapping.values())
+        if label_col:
+            # Add any override labels not already covered by the .do file, so replace_strict and the
+            # final Enum cast both recognize them as valid
+            extra = sorted(override_values.get(label_col, set()) - set(categories))
+            categories += extra
+
+        # Map real value codes to labels
+        # Codes with no matching key become null automatically via default = None
+        factor_expr = pl.col(col).replace_strict(col_mapping, default=None, return_dtype=pl.Utf8)
+
+        if label_col:
+            # Non-null values in the _label column override the .do-derived label for that ro
+            factor_expr = (
+                pl.when(pl.col(label_col).is_not_null())
+                .then(pl.col(label_col))
+                .otherwise(factor_expr)
+            )
+            label_cols_to_drop.append(label_col)
+
+        exprs.append(factor_expr.cast(pl.Enum(categories)).alias(col))
+
+    # Null out sentienl codes for columns that are entirely missing
+    for col in plain_numeric_cols:
+        exprs.append(
+            pl.when(pl.col(col).is_in(sentinel_codes)).then(None).otherwise(pl.col(col)).alias(col)
+        )
+
+    # All column transformations run in a single with_columns call rather than one call per column
+    if exprs:
+        lf = lf.with_columns(exprs)
+    # _label companion columns are consumed as overrides above and dropped
+    if label_cols_to_drop:
+        lf = lf.drop(label_cols_to_drop)
+
+    return lf
