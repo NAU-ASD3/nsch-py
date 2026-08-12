@@ -17,8 +17,8 @@ def apply_do_labels(
     present in both ``lf`` and ``define_lf``, real value codes are mapped to ``Polars`` Enum
     dtype and sentinal codes (996-999) become ``None`` (null). If a ``_label`` companion column
     exists (created by ``transform_values``), those labels override the ``.do``-derived labels
-    for matching rows, and the companio column is removed. Columns with no matching ``define``
-    entries are left numeric, but sentinal codes are still replaced with ``None``.
+    for matching rows, and the companion column is removed. Columns with no matching ``define``
+    entries are left numeric, but sentinel codes are still replaced with ``None``.
 
     When a column's name in ``lf`` differs from the variable name in ``define_lf`` because an
     upstream ``rename_vars`` or ``merge_vars`` change the column name, pass an ``alias`` map so
@@ -31,8 +31,8 @@ def apply_do_labels(
         produced by the transform/rename/merge/subset pipeline.
 
     define_lf : pl.LazyFrame
-        A frame with columns ``variable``, ``value``, and ``desc``
-        as returned by ``parse_do`` from ``nsch.readers``.
+        The ``define`` frame in the ``DoSpec`` with columns ``variable``,
+        ``value``, and ``desc`` as returned by ``parse_do`` from ``nsch.readers``.
         Contains the value-to-label mapping for each survey variable.
 
     alias : list[str]
@@ -50,6 +50,33 @@ def apply_do_labels(
 
     Examples
     --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame({"sc_sex": [1, 2, 997, 998]})
+    >>> define_lf = pl.LazyFrame(
+    ...     {
+    ...         "variable": ["sc_sex"] * 5,
+    ...         "value": ["1", "2", "m", "n", "d"],
+    ...         "desc": [
+    ...             "Male",
+    ...             "Female",
+    ...             "No valid response",
+    ...             "Not in universe",
+    ...             "Suppressed for confidentiality",
+    ...         ],
+    ...     }
+    ... )
+    >>> apply_do_labels(lf=lf, define_lf=define_lf).collect()
+    shape: (4, 1)
+    ┌────────┐
+    │ sc_sex │
+    │ ---    │
+    │ enum   │
+    ╞════════╡
+    │ Male   │
+    │ Female │
+    │ null   │
+    │ null   │
+    └────────┘
     """
     sentinel_codes = [tag.value for tag in TaggedNA]
     missing_values = ["m", "n", "l", "d"]  # Need a better way than hardcoding this maybe
