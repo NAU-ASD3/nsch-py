@@ -34,7 +34,7 @@ TAGGED_NA_MAP = {
 
 def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) -> pl.LazyFrame:
     """Helper function for ``read_nsch_dta`` to map each missingness type per column
-    and cast columns to the appropriate ``polars`` eqivalent of their STATA type.
+    and cast columns to the appropriate ``polars`` equivalent of their STATA type.
 
     Parameters
     ----------
@@ -139,12 +139,12 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
     """
     if not path.exists():
         raise FileNotFoundError(
-            f".dta path should be the path to a Stata.dta file, "
+            f".dta path should be the path to a Stata .dta file, "
             f"but this file does not exist: {path}"
         )
     df, meta = pyreadstat.read_dta(str(path), user_missing=True, output_format="polars")
 
-    # Cast Object datatypes to string before ganding to _rewrite_tagged_na
+    # Cast Object datatypes to string before handing to _rewrite_tagged_na
     # Polars gets stuck if there are Object types
     object_cols = [c for c in df.columns if df.schema[c] == pl.Object]
     df = df.with_columns(
@@ -161,7 +161,7 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
         ]
     )
 
-    # _rewrite_tagged_na maps remaps nulls to our sentinel values
+    # _rewrite_tagged_na remaps tagged letters to our sentinel values
     # pyreadstat removes the . before missing values, so these are strings
     # with only the associated missingness letter
     lf = _rewrite_tagged_na(df.lazy(), meta)
@@ -170,7 +170,7 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
     # numeric 2 for consistency.
     schema = lf.collect_schema()
     # Next grabs the first stratum column it sees instead of building the whole column list
-    # .lower protects against inconsitant capitalization but not other naming inconsistancies
+    # .lower protects against inconsistent capitalization but not other naming inconsistencies
     stratum_col = next((c for c in schema.names() if c.lower() == "stratum"), None)
 
     if stratum_col is None:
@@ -179,7 +179,7 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
     # Make sure str.replace only runs on columns that are already string types
     stratum_expr = (
         pl.col(stratum_col).str.replace(r"^2[aA]?$", "2").cast(pl.Int64)
-        if stratum_col is not None and schema[stratum_col] == pl.String
+        if schema[stratum_col] == pl.String
         else pl.col(stratum_col).cast(pl.Int64)
     )
 
