@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import polars as pl
 
-from nsch._types import TaggedNA
+from nsch._types import STATA_TAG_TO_SENTINEL, TaggedNA
 
 __all__ = ["apply_do_labels"]
 
@@ -35,11 +35,11 @@ def apply_do_labels(
         ``value``, and ``desc`` as returned by ``parse_do`` from ``nsch.readers``.
         Contains the value-to-label mapping for each survey variable.
 
-    alias : list[str]
+    alias : dict[str, str]
         An optional list mapping a column name in ``lf`` to the
         variable name to look up in ``define_lf``. Used by ``harmonize_year``
         to handle columns whose names changed via ``rename_vars`` or ``merge_vars``
-        from ``nsch.harmonize``. For example, ["family" : "family_r"] tells this
+        from ``nsch.harmonize``. For example, {"family" : "family_r"} tells this
         function to label the ``family`` column using ``family_r``'s
         define entries. Default is ``None``.
 
@@ -79,7 +79,7 @@ def apply_do_labels(
     └────────┘
     """
     sentinel_codes = [tag.value for tag in TaggedNA]
-    missing_values = ["m", "n", "l", "d"]  # Need a better way than hardcoding this maybe
+    missing_values = STATA_TAG_TO_SENTINEL.keys()
 
     schema = lf.collect_schema()
     lf_vars = schema.names()

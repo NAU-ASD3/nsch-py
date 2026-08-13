@@ -17,7 +17,7 @@ def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["sc_sex"] * 5,
-            "value": ["1", "2", "m", "n", "d"],
+            "value": ["1", "2", ".m", ".n", ".d"],
             "desc": [
                 "Male",
                 "Female",
@@ -42,7 +42,7 @@ def test_sentinel_codes_all_map_to_None() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["sc_sex"] * 6,
-            "value": ["1", "2", "m", "n", "l", "d"],
+            "value": ["1", "2", ".m", ".n", ".l", ".d"],
             "desc": [
                 "Male",
                 "Female",
@@ -65,7 +65,7 @@ def test_label_column_takes_priority_over_do_derived_labels() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["birthwt"] * 6,
-            "value": ["1", "2", "3", "m", "n", "d"],
+            "value": ["1", "2", "3", ".m", ".n", ".d"],
             "desc": [
                 "Very low birth weight",
                 "Low birth weight",
@@ -99,6 +99,3 @@ def test_numeric_columns_without_define_entries_are_untouched() -> None:
     result = apply_do_labels(lf, define_lf)
     expected = pl.LazyFrame({"fpl_i1": [100, 200, None]})
     assert_frame_equal(result, expected)
-
-
-# What is special in the 2024 data that requires a specific test?

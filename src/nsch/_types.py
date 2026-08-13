@@ -15,7 +15,16 @@ from typing import NamedTuple
 
 import polars as pl
 
-__all__ = ["DoSpec", "TaggedNA"]
+__all__ = ["STATA_TAG_TO_SENTINEL", "DoSpec", "TaggedNA"]
+
+# Mapping of character STATA tags to sentinal numeric values for use in other modules
+# See `TaggedNA` below for further descriptions for these tags
+STATA_TAG_TO_SENTINEL = {
+    ".m": 996,  # No Response
+    ".n": 997,  # Not in Universe
+    ".l": 998,  # Logical Skip
+    ".d": 999,  # Suppressed
+}
 
 
 class DoSpec(NamedTuple):
