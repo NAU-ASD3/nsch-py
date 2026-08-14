@@ -89,11 +89,13 @@ def apply_do_labels(
     # Make alias an empty dict if it does not exist (is None)
     alias = alias or {}
 
-    # Get the values form the .do define tables that are not NA tags
+    # Get the values from the .do define tables that are not NA tags
     # Use ~ to negate element-wise and not on the series whose truth value is ambiguous
     # Sorts to mirror the ordered factor levels in R
     real_defs = (
         define_df.filter(~pl.col("value").is_in(missing_values))
+        # Cast to pl.Float64 will fail loudly in the event of a non-numeric column rather than
+        # quietly giving NA like as.numeric in the R code does
         .with_columns(pl.col("value").cast(pl.Float64).alias("_num"))
         .sort("_num")
     )
@@ -126,7 +128,7 @@ def apply_do_labels(
             plain_numeric_cols.append(col)
 
     # Scan the data once for override label values actually present in each _label column,
-    # so a label introduced only via override rather than in the .do will still mapt to a
+    # so a label introduced only via override rather than in the .do will still map to a
     # valid Enum category.
     override_label_cols = [lc for _, lc, _ in mapped_cols if lc]
     override_values: dict[str, set[str]] = {}
@@ -154,6 +156,8 @@ def apply_do_labels(
         if label_col:
             # Add any override labels not already covered by the .do file, so replace_strict and the
             # final Enum cast both recognize them as valid
+            # These labels are appended sorted rather than in the order of first appearance,
+            # which diverges from the R logic
             extra = sorted(override_values.get(label_col, set()) - set(categories))
             categories += extra
 
@@ -162,7 +166,7 @@ def apply_do_labels(
         factor_expr = pl.col(col).replace_strict(col_mapping, default=None, return_dtype=pl.Utf8)
 
         if label_col:
-            # Non-null values in the _label column override the .do-derived label for that ro
+            # Non-null values in the _label column override the .do-derived label for that row
             factor_expr = (
                 pl.when(pl.col(label_col).is_not_null())
                 .then(pl.col(label_col))
@@ -172,10 +176,14 @@ def apply_do_labels(
 
         exprs.append(factor_expr.cast(pl.Enum(categories)).alias(col))
 
-    # Null out sentienl codes for columns that are entirely missing
+    # Null out sentinel codes for columns that are entirely missing
     for col in plain_numeric_cols:
         exprs.append(
-            pl.when(pl.col(col).is_in(sentinel_codes)).then(None).otherwise(pl.col(col)).alias(col)
+            pl.when(pl.col(col).is_in(sentinel_codes))
+            .then(None)
+            .otherwise(pl.col(col))
+            .cast(schema[col])
+            .alias(col)
         )
 
     # All column transformations run in a single with_columns call rather than one call per column

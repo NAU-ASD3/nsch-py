@@ -99,3 +99,58 @@ def test_numeric_columns_without_define_entries_are_untouched() -> None:
     result = apply_do_labels(lf, define_lf)
     expected = pl.LazyFrame({"fpl_i1": [100, 200, None]})
     assert_frame_equal(result, expected)
+
+
+def test_variable_with_only_missing_codes_falls_through_to_plain_numeric() -> None:
+    lf = pl.LazyFrame({"all_missing": [996, 997, None]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["all_missing"] * 4,
+            "value": [".m", ".n", ".l", ".d"],
+            "desc": [
+                "No Response",
+                "Not In Universe",
+                "Logical Skip",
+                "Suppressed",
+            ],
+        }
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"all_missing": [None, None, None]}, schema={"all_missing": pl.Int64})
+    assert_frame_equal(result, expected)
+
+
+def test_provided_alias_map_is_used() -> None:
+    lf = pl.LazyFrame({"family": [1, 2, 998]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["family_r"] * 4,
+            "value": ["1", "2", "3", ".d"],
+            "desc": [
+                "Two biogical/adoptive parents, currently married",
+                "Two biogical/adoptive parents, not currently married",
+                "Two parents (at least one not biological/adoptive), currently married",
+                "Suppressed for Confidentiality",
+            ],
+        }
+    )
+    result = apply_do_labels(lf, define_lf, alias={"family": "family_r"})
+    expected = pl.LazyFrame(
+        {
+            "family": [
+                "Two biogical/adoptive parents, currently married",
+                "Two biogical/adoptive parents, not currently married",
+                None,
+            ]
+        },
+        schema={
+            "family": pl.Enum(
+                [
+                    "Two biogical/adoptive parents, currently married",
+                    "Two biogical/adoptive parents, not currently married",
+                    "Two parents (at least one not biological/adoptive), currently married",
+                ]
+            )
+        },
+    )
+    assert_frame_equal(result, expected)
