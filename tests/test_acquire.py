@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from typing import TYPE_CHECKING
 
 import polars as pl
 import pytest
@@ -11,17 +12,21 @@ import requests
 
 from nsch.acquire import get_all_years, get_nsch_index, get_year
 
-YEAR_URL = "https://www.census.gov/programs-surveys/nsch/data/datasets.2021.html"
-ZIP_URL = "https://www2.census.gov/programs-surveys/nsch/datasets/2021/mock_2021_topical_Stata.zip"
+if TYPE_CHECKING:
+    from pathlib import Path
+
+# Fake URLs for mock 2021 html index page
+YEAR_URL = "https://www.mock/datasets.2021.html"
+ZIP_URL = "http://www.mock.com/mock_2021_topical_Stata.zip"
 
 
-def test_get_nsch_index_creates_index_file(tmp_path) -> None:
+def test_get_nsch_index_creates_index_file(tmp_path: Path) -> None:
     html_path = tmp_path / "index.html"
     get_nsch_index(local_html_path=html_path)
     assert html_path.exists()
 
 
-def test_get_nsch_index_returns_list_of_years_after_2016(tmp_path) -> None:
+def test_get_nsch_index_returns_list_of_years_after_2016(tmp_path: Path) -> None:
     html_path = tmp_path / "index.html"
     result = get_nsch_index(local_html_path=html_path)
     assert (result["year"] >= 2016).all()
@@ -37,9 +42,18 @@ def create_mock_zipfile() -> bytes:
     return buffer.getvalue()
 
 
-def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path, requests_mock) -> None:
-    requests_mock.get(YEAR_URL, content=f'<a href="{ZIP_URL}">STATA data file</a>'.encode())
+def create_mock_index_page(requests_mock, hrefs: tuple[str, ...] = (ZIP_URL,)) -> bytes:
+    """Build a fake HTML page for 2021, containing exactly one topical_Stata.zip link"""
+    links = " ".join(f'<a href="{href}">STATA data file</a>' for href in hrefs)
+    fake_html = f"<!DOCTYPE html><html><body>{links}</body></html>"
+    requests_mock.get(YEAR_URL, text=fake_html)
+    # include a file with bytes actually zipped
     requests_mock.get(ZIP_URL, content=create_mock_zipfile())
+
+
+def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path: Path, requests_mock) -> None:
+    create_mock_index_page(requests_mock)
+
     result = get_year(YEAR_URL, tmp_path)
 
     assert result == tmp_path / "mock_2021_topical_Stata.zip"
@@ -49,11 +63,16 @@ def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path, requests_mock)
     assert requests_mock.call_count == 2  # one for the html page, one for the zip
 
 
-def test_get_year_does_nothing_if_already_exists_locally(tmp_path, requests_mock) -> None:
+def test_get_year_does_nothing_if_already_exists_locally(tmp_path: Path, requests_mock) -> None:
     (tmp_path / "datasets.2021.html").write_text(f'<a href="{ZIP_URL}">STATA data file</a>')
     (tmp_path / "mock_2021_topical_Stata.zip").write_bytes(create_mock_zipfile())
 
+    # fake HTML page for 2021, containing exactly one topical_Stata.zip link
+    # Mocks are still registered (not skipped) even though we expect zero calls
+    create_mock_index_page(requests_mock)
+
     result = get_year(YEAR_URL, tmp_path)
+
     # Make sure there are no calls, will raise NoMockAddress if
     # requests.get is unnecessarily called
     assert requests_mock.call_count == 0
@@ -61,32 +80,34 @@ def test_get_year_does_nothing_if_already_exists_locally(tmp_path, requests_mock
     assert (tmp_path / "mock_2021_topical.dta").exists()
 
 
-def test_get_year_raises_error_if_no_zip_links_found(tmp_path, requests_mock) -> None:
+def test_get_year_raises_error_if_no_zip_links_found(tmp_path: Path, requests_mock) -> None:
     requests_mock.get(YEAR_URL, content=b"<html>no zip link here</html>")
+    create_mock_index_page(requests_mock, hrefs=())
 
     with pytest.raises(ValueError, match="found 0"):
         get_year(YEAR_URL, tmp_path)
 
 
-def test_get_year_raises_error_if_more_than_one_zip_link_found(tmp_path, requests_mock) -> None:
-    requests_mock.get(
-        YEAR_URL,
-        content=(f'<a href="{ZIP_URL}">one</a>\n<a href="{ZIP_URL}">two</a>').encode(),
-    )
+def test_get_year_raises_error_if_more_than_one_zip_link_found(
+    tmp_path: Path, requests_mock
+) -> None:
+    # Place both links on the same line to make sure we cout regex matches
+    # rather than lines themselves
+    create_mock_index_page(requests_mock, hrefs=(ZIP_URL, ZIP_URL))
 
     with pytest.raises(ValueError, match="found 2"):
         get_year(YEAR_URL, tmp_path)
 
 
-def test_get_year_raises_http_error_on_bad_status(tmp_path, requests_mock) -> None:
-    # Uses the real requests.exceptions.HTTPError path via raise_for_status()
+def test_get_year_raises_http_error_on_bad_status(tmp_path: Path, requests_mock) -> None:
+    # Uses requests.exceptions.HTTPError path via raise_for_status()
     requests_mock.get(YEAR_URL, status_code=403)
 
     with pytest.raises(requests.exceptions.HTTPError):
         get_year(YEAR_URL, tmp_path)
 
 
-def test_discovers_dta_and_do_files_with_standard_naming(tmp_path) -> None:
+def test_discovers_dta_and_do_files_with_standard_naming(tmp_path: Path) -> None:
     # Create temp test directory with fake .dta and .do files
     path_strings = [
         "nsch_2016_topical.dta",
@@ -104,14 +125,14 @@ def test_discovers_dta_and_do_files_with_standard_naming(tmp_path) -> None:
     assert result.columns == ["year", "dta_path", "do_path"]
 
 
-def test_get_all_years_discovers_files_with_non_standard_naming(tmp_path) -> None:
+def test_get_all_years_discovers_files_with_non_standard_naming(tmp_path: Path) -> None:
     (tmp_path / "nsch_2024e_topical.dta").touch()
     (tmp_path / "nsch_2024_topical.do").touch()
     result = get_all_years(data_path=tmp_path, download=False)
     assert result["year"].to_list() == [2024]
 
 
-def test_get_all_years_filters_to_requested_years(tmp_path) -> None:
+def test_get_all_years_filters_to_requested_years(tmp_path: Path) -> None:
     for year in range(2016, 2018):
         file_path = tmp_path / ("nsch_" + str(year) + "_topical.dta")
         file_path.touch()
@@ -121,6 +142,6 @@ def test_get_all_years_filters_to_requested_years(tmp_path) -> None:
     assert result["year"].to_list() == [2016, 2017]
 
 
-def test_get_all_years_throws_error_when_no_dta_files_found(tmp_path) -> None:
+def test_get_all_years_throws_error_when_no_dta_files_found(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="No \\.dta files found"):
         get_all_years(data_path=tmp_path, download=False)
