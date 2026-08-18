@@ -7,14 +7,110 @@ from typing import TypedDict
 
 import polars as pl
 
-__all__ = ["TransformValues", "subset_vars", "transform_values"]
+__all__ = ["RenameRule", "TransformValues", "rename_vars", "subset_vars", "transform_values"]
+
+
+class RenameRule(TypedDict):
+    """One rename rule: the years it applies to, and the harmonized name."""
+
+    years: list[str]
+    new_name: str
 
 
 class TransformValues(TypedDict):
+    """One transform rule: the years and values it applies to, and the new values and labels."""
+
     years: list[str]
     value: list[str]
     new_value: list[str]
     new_label: list[str]
+
+
+def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> pl.LazyFrame:
+    """Rename columns for one survey year according to the rename rules.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        One year's data, before renaming.
+    renames : dict[str, RenameRule]
+        Maps a source column name to its rule. A rule applies only when ``year``
+        is in the rule's ``years``.
+    year : int
+        The survey year ``lf`` holds. Compared against each rule's ``years``,
+        which the config stores as strings.
+
+    Returns
+    -------
+    pl.LazyFrame
+        The frame with matching columns renamed, each column's ``_label``
+        companion renamed alongside it. Columns with no applicable rule, and
+        rules naming a column that isn't present, are left alone.
+
+    Raises
+    ------
+    ValueError
+        If two rules rename different columns to the same name, or if a rule
+        renames a column onto the name of one that already exists and isn't
+        itself being renamed. Both point at a malformed config.
+
+    Notes
+    -----
+    Renames are applied all at once rather than one after another. The R
+    version loops and renames in place, so a pair of rules like ``a -> b`` and
+    ``b -> c`` cascades there and ``a`` ends up as ``c``. Here both rules read
+    the original column names, so ``a`` becomes ``b`` and the original ``b``
+    becomes ``c``. Reading from the original names is the intended behavior: a
+    rule should describe the column it names in the source data, not whatever
+    an earlier rule happened to leave behind.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame({"gowhensick": [4, 8]})
+    >>> rule = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    >>> rename_vars(lf, rule, 2023).collect().columns
+    ['k4q02_r']
+    """
+    # A LazyFrame has no cheap `.columns`; ask the schema for the names.
+    present = set(lf.collect_schema().names())
+    # The config stores years as strings; `year` arrives as an int.
+    year_str = str(year)
+    mapping: dict[str, str] = {}
+    for old, rule in renames.items():
+        if year_str not in rule["years"] or old not in present:
+            continue
+        new_name = rule["new_name"]
+        mapping[old] = new_name
+        # A column's labels live in `<name>_label`; rename them together.
+        old_label = f"{old}_label"
+        if old_label in present:
+            mapping[old_label] = f"{new_name}_label"
+
+    # Two rules pointing at the same name would silently collapse two columns
+    # into one, so catch it here where we can name the year and the columns.
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for target in mapping.values():
+        if target in seen:
+            duplicates.add(target)
+        seen.add(target)
+    if duplicates:
+        raise ValueError(
+            f"Rename rules for {year} map more than one column to: {', '.join(sorted(duplicates))}"
+        )
+
+    # Renaming onto a column that already exists and isn't itself being renamed
+    # collides. Polars raises for this, but without saying which year or rule
+    # caused it.
+    collisions = sorted(set(mapping.values()) & (present - set(mapping)))
+    if collisions:
+        raise ValueError(
+            f"Rename rules for {year} target existing columns that are not "
+            f"themselves renamed: {', '.join(collisions)}"
+        )
+
+    return lf.rename(mapping)
 
 
 def transform_values(

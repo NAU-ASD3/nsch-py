@@ -26,6 +26,7 @@ That uses [uv](https://docs.astral.sh/uv/) to set up Python and the dependencies
 
 ## Where to go next
 
+- [Project primer](project-primer.md) covers the research project, the top-level API, and who the package is for. Start here if you're new.
 - [Onboarding](onboarding.md) takes a new contributor from a fresh laptop to a first merged pull request.
 - [Development walkthrough](development-walkthrough.md) follows one real change from issue to merge.
 - [Design decisions](design-decisions.md) explains why the package is built the way it is.
