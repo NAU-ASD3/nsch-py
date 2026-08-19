@@ -14,6 +14,10 @@ so each version stays unique and the date stays honest.
 - Added `get_year` to read one year's NSCH STATA `.dta` and `.do` files
 - Added `get_all_years` to create a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
 
+## 2026.8.13 (PR#59)
+
+- Added `read_nsch_dta` and  `readers.py` module for ingesting data and handling tagged NAs
+
 ## 2026.7.29.3 (PR#55)
 
 - Added a Version 0 runbook documenting the workflow for adding a new NSCH survey year, covering variable configuration, transforms, renames, merges, and validation.
