@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -15,7 +16,7 @@ nsch_url_prefix = "https://www.census.gov/programs-surveys/nsch/data/datasets."
 nsch_data_url = nsch_url_prefix + "html"
 
 
-def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
+def get_nsch_index(local_html_path: Path | None = None) -> pl.DataFrame:
     """
     Download and parse the NSCH index web page to obtain a list
     of years for which survey data are available.
@@ -31,6 +32,11 @@ def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
     -------
     A pl.DataFrame containing one row per year of data, and columns ``url``, ``year``.
     """
+    # If no file path is passed for caching, create a temp file
+    if local_html_path is None:
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
+            local_html_path = Path(tmp.name)
+
     local_html_path = Path(local_html_path)
     if not local_html_path.exists():
         # create empty parent directories if they don't exist
@@ -41,7 +47,7 @@ def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
 
     # Get text of html paths on the index page
     html_text = local_html_path.read_text(encoding="utf-8").splitlines()
-    # Get html strings with each year, escape special charachters
+    # Get html strings with each year, escape special characters
     # name url with group and "url" and, if present, name found digits with the group "year"
     url_pattern = r"(?P<url>" + re.escape(nsch_url_prefix) + r"(?P<year>[0-9]+)\.html)"
 
@@ -61,7 +67,9 @@ def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
     return year_dt.unique(maintain_order=True)
 
 
-def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
+def get_year(
+    year_url: str, data_path: Path = Path("NSCH_data/00_original_Stata"), verbose: bool = False
+) -> Path:
     """Download one year of NSCH data
 
     If the input web page does not exist in the data_path
@@ -86,7 +94,7 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     Path to the resulting download
 
     """
-    # don't need to check if year_url is string, python handles this by defining parameter as string
+    # don't need to check if year_url is string, python will pass objects and mypy handles typing
     # same for data_path and verbose
     data_path = Path(data_path)
     Path(data_path).mkdir(parents=True, exist_ok=True)
@@ -126,12 +134,12 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
     with zipfile.ZipFile(data_path_year_zip, "r") as zip_ref:
         zip_ref.extractall(data_path)
 
-    # Return zip file path for testing purposes
+    # Return zip file path like the R function
     return Path(data_path_year_zip)
 
 
 def get_all_years(
-    data_path: Path, years: list[int] | None = None, download: bool = True
+    data_path: Path, years: list[int] | None = None, download: bool = False
 ) -> pl.DataFrame:
     """Discover NSCH data files for all available years
 
@@ -144,7 +152,7 @@ def get_all_years(
     ----------
     data_path: Path
         Directory containing NSCH ``.dta`` and ``.do`` files.
-    years: int
+    years: list[int]
         Optional integer list of years to include.
         If ``None``, all discovered years are returned.
     download: bool
