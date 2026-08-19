@@ -6,11 +6,11 @@ import io
 import zipfile
 from typing import TYPE_CHECKING
 
+import httpx
 import polars as pl
 import pytest
-import requests
 
-from nsch.acquire import get_all_years, get_nsch_index, get_year
+from nsch.acquire import get_all_years, get_nsch_index, get_year, nsch_data_url, nsch_url_prefix
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,39 +20,45 @@ YEAR_URL = "https://www.mock/datasets.2021.html"
 ZIP_URL = "http://www.mock.com/mock_2021_topical_Stata.zip"
 
 
-def test_get_nsch_index_creates_index_file(tmp_path: Path) -> None:
-    html_path = tmp_path / "index.html"
-    get_nsch_index(local_html_path=html_path)
-    assert html_path.exists()
+def test_get_nsch_index_creates_index_file_and_removes_duplicates(
+    tmp_path: Path, respx_mock
+) -> None:
+    fake_index_html = (
+        f'<a href="{nsch_url_prefix}2016.html">2016</a>'
+        f'<a href="{nsch_url_prefix}2017.html">2017</a>'
+        f'<a href="{nsch_url_prefix}2017.html">2017 duplicate</a>'
+    )
+    respx_mock.get(nsch_data_url).respond(text=fake_index_html)
 
-
-def test_get_nsch_index_returns_list_of_years_after_2016(tmp_path: Path) -> None:
     html_path = tmp_path / "index.html"
     result = get_nsch_index(local_html_path=html_path)
-    assert (result["year"] >= 2016).all()
-    assert result["year"].is_unique().all()
+
+    assert html_path.exists()
+    # also asserts years are confined to those listed in the index
+    assert sorted(result["year"].to_list()) == [2016, 2017]
+    assert result.height == 2
 
 
 # Testing functions for get_year
 def create_mock_zipfile() -> bytes:
-    """Build an in-memory zip file's bytes so requests_mock can serve it as content."""
+    """Build an in-memory zip file's bytes so respx_mock can serve it as content."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zf:
         zf.writestr("mock_2021_topical.dta", "fake stata data")
     return buffer.getvalue()
 
 
-def create_mock_index_page(requests_mock, hrefs: tuple[str, ...] = (ZIP_URL,)) -> bytes:
+def create_mock_index_page(respx_mock, hrefs: tuple[str, ...] = (ZIP_URL,)) -> bytes:
     """Build a fake HTML page for 2021, containing exactly one topical_Stata.zip link"""
     links = " ".join(f'<a href="{href}">STATA data file</a>' for href in hrefs)
     fake_html = f"<!DOCTYPE html><html><body>{links}</body></html>"
-    requests_mock.get(YEAR_URL, text=fake_html)
+    respx_mock.get(YEAR_URL).respond(text=fake_html)
     # include a file with bytes actually zipped
-    requests_mock.get(ZIP_URL, content=create_mock_zipfile())
+    respx_mock.get(ZIP_URL).respond(content=create_mock_zipfile())
 
 
-def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path: Path, requests_mock) -> None:
-    create_mock_index_page(requests_mock)
+def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path: Path, respx_mock) -> None:
+    create_mock_index_page(respx_mock)
 
     result = get_year(YEAR_URL, tmp_path)
 
@@ -60,50 +66,46 @@ def test_get_year_downloads_if_webpage_not_in_data_path(tmp_path: Path, requests
     assert (tmp_path / "datasets.2021.html").exists()
     assert (tmp_path / "mock_2021_topical_Stata.zip").exists()
     assert (tmp_path / "mock_2021_topical.dta").exists()
-    assert requests_mock.call_count == 2  # one for the html page, one for the zip
+    assert len(respx_mock.calls) == 2  # one for the html page, one for the zip
 
 
-def test_get_year_does_nothing_if_already_exists_locally(tmp_path: Path, requests_mock) -> None:
+def test_get_year_does_nothing_if_already_exists_locally(tmp_path: Path, respx_mock) -> None:
     (tmp_path / "datasets.2021.html").write_text(f'<a href="{ZIP_URL}">STATA data file</a>')
     (tmp_path / "mock_2021_topical_Stata.zip").write_bytes(create_mock_zipfile())
 
     # fake HTML page for 2021, containing exactly one topical_Stata.zip link
     # Mocks are still registered (not skipped) even though we expect zero calls
-    create_mock_index_page(requests_mock)
-
+    create_mock_index_page(respx_mock)
     result = get_year(YEAR_URL, tmp_path)
 
-    # Make sure there are no calls, will raise NoMockAddress if
-    # requests.get is unnecessarily called
-    assert requests_mock.call_count == 0
+    # Make sure there are no calls, will raise NoMockAddress if requests.get is unnecessarily called
+    respx_mock.assert_all_called = False
+
+    assert len(respx_mock.calls) == 0
     assert result == tmp_path / "mock_2021_topical_Stata.zip"
     assert (tmp_path / "mock_2021_topical.dta").exists()
 
 
-def test_get_year_raises_error_if_no_zip_links_found(tmp_path: Path, requests_mock) -> None:
-    requests_mock.get(YEAR_URL, content=b"<html>no zip link here</html>")
-    create_mock_index_page(requests_mock, hrefs=())
+def test_get_year_raises_error_if_no_zip_links_found(tmp_path: Path, respx_mock) -> None:
+    create_mock_index_page(respx_mock, hrefs=())
 
     with pytest.raises(ValueError, match="found 0"):
         get_year(YEAR_URL, tmp_path)
 
 
-def test_get_year_raises_error_if_more_than_one_zip_link_found(
-    tmp_path: Path, requests_mock
-) -> None:
+def test_get_year_raises_error_if_more_than_one_zip_link_found(tmp_path: Path, respx_mock) -> None:
     # Place both links on the same line to make sure we cout regex matches
     # rather than lines themselves
-    create_mock_index_page(requests_mock, hrefs=(ZIP_URL, ZIP_URL))
+    create_mock_index_page(respx_mock, hrefs=(ZIP_URL, ZIP_URL))
 
     with pytest.raises(ValueError, match="found 2"):
         get_year(YEAR_URL, tmp_path)
 
 
-def test_get_year_raises_http_error_on_bad_status(tmp_path: Path, requests_mock) -> None:
+def test_get_year_raises_http_error_on_bad_status(tmp_path: Path, respx_mock) -> None:
     # Uses requests.exceptions.HTTPError path via raise_for_status()
-    requests_mock.get(YEAR_URL, status_code=403)
-
-    with pytest.raises(requests.exceptions.HTTPError):
+    respx_mock.get(YEAR_URL).respond(403)
+    with pytest.raises(httpx.HTTPStatusError):
         get_year(YEAR_URL, tmp_path)
 
 
@@ -145,3 +147,20 @@ def test_get_all_years_filters_to_requested_years(tmp_path: Path) -> None:
 def test_get_all_years_throws_error_when_no_dta_files_found(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="No \\.dta files found"):
         get_all_years(data_path=tmp_path, download=False)
+
+
+def test_get_year_follows_redirect_on_html_page(tmp_path: Path, respx_mock) -> None:
+    redirected_url = "https://www.mock/datasets_2021_alt.html"
+    fake_html = f'<!DOCTYPE html><html><body><a href="{ZIP_URL}">STATA data file</a></body></html>'
+
+    respx_mock.get(YEAR_URL).respond(302, headers={"Location": redirected_url})
+    respx_mock.get(redirected_url).respond(text=fake_html)
+    # Get another file (similarity of zip contents doesn't matter)
+    respx_mock.get(ZIP_URL).respond(content=create_mock_zipfile())
+
+    result = get_year(YEAR_URL, tmp_path)
+
+    assert result == tmp_path / "mock_2021_topical_Stata.zip"
+    assert (tmp_path / "mock_2021_topical.dta").exists()
+    # 3 calls: YEAR_URL (302) -> redirected_url (200) -> ZIP_URL (200)
+    assert len(respx_mock.calls) == 3

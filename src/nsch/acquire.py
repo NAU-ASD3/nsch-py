@@ -6,8 +6,8 @@ import re
 import zipfile
 from pathlib import Path
 
+import httpx
 import polars as pl
-import requests
 
 __all__ = ["get_all_years", "get_nsch_index", "get_year"]
 
@@ -35,7 +35,7 @@ def get_nsch_index(local_html_path: Path = Path("temp")) -> pl.DataFrame:
     if not local_html_path.exists():
         # create empty parent directories if they don't exist
         local_html_path.parent.mkdir(parents=True, exist_ok=True)
-        response = requests.get(nsch_data_url, timeout=30)
+        response = httpx.get(nsch_data_url, timeout=30, follow_redirects=True)
         response.raise_for_status()
         local_html_path.write_bytes(response.content)
 
@@ -97,31 +97,28 @@ def get_year(year_url: str, data_path: Path, verbose: bool = False) -> Path:
         if verbose:
             print(f"Downloading {year_url} -> {data_path}")
         # download the year-specific html page
-        response = requests.get(year_url, timeout=30)
+        response = httpx.get(year_url, timeout=30, follow_redirects=True)
         response.raise_for_status()
         data_path_year_html.write_bytes(response.content)
     lines = data_path_year_html.read_text(encoding="utf-8").splitlines()
-    url_df = pl.DataFrame({"line": lines})
-    extracted = url_df.select(
-        pl.col("line")
-        # match protocol-relative "//...topical_Stata.zip"
-        .str.extract(r"(?P<url>(?:https?:)?//[^\s\"'<>]*?topical_Stata\.zip)", 1)
-        .alias("url")
-    ).drop_nulls()
+    # Make sure URLS on the same line are split
+    text = "\n".join(lines)
 
-    if extracted.height != 1:
-        raise ValueError(
-            f"expected 1 topical_Stata.zip url on {year_url} but found {extracted.height}"
-        )
+    # match protocol-relative "//...topical_Stata.zip"
+    pattern = r"(?:https?:)?//[^\s\"'<>]*?topical_Stata\.zip"
+    matches = re.findall(pattern, text)
 
-    raw_url = extracted[0, "url"]
+    if len(matches) != 1:
+        raise ValueError(f"Expected 1 topical_Stata.zip url on {year_url} but found {len(matches)}")
+
+    raw_url = matches[0]
     http_url = raw_url if raw_url.startswith("http") else "https:" + raw_url
 
     year_zip = http_url.split("/")[-1]
     data_path_year_zip = data_path / year_zip
 
     if not data_path_year_zip.exists():
-        response = requests.get(http_url, timeout=30)
+        response = httpx.get(http_url, timeout=30, follow_redirects=True)
         response.raise_for_status()
         data_path_year_zip.write_bytes(response.content)
 
