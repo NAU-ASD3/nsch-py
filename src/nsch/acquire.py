@@ -188,6 +188,11 @@ def get_all_years(
             if match is None:
                 raise ValueError(f"Could not extract a 4-digit year from filename: {f.name}")
             file_years.append(int(match.group()))
+        # Throw a helpful error if there are same-year collisions rather than a raw polars
+        # 1:1 error in the join below
+        if len(file_years) != len(set(file_years)):
+            dupes = sorted({y for y in file_years if file_years.count(y) > 1})
+            raise ValueError(f"Multiple .{suffix} files found for year(s): {dupes}")
         col_name = f"{suffix}_path"
         df_dict[suffix] = pl.DataFrame({"year": file_years, col_name: [str(f) for f in files]})
 
@@ -196,6 +201,7 @@ def get_all_years(
         .join(df_dict["do"], on="year", how="full", coalesce=True, validate="1:1")
         .sort("year")
     )
+
     # Make sure we have .do files for every .dta and vice versa
     missing = joined_dta_do.filter(pl.col("dta_path").is_null() | pl.col("do_path").is_null())
     if missing.height > 0:

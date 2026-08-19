@@ -164,3 +164,12 @@ def test_get_year_follows_redirect_on_html_page(tmp_path: Path, respx_mock) -> N
     assert (tmp_path / "mock_2021_topical.dta").exists()
     # 3 calls: YEAR_URL (302) -> redirected_url (200) -> ZIP_URL (200)
     assert len(respx_mock.calls) == 3
+
+
+def test_get_all_years_raises_on_duplicate_year_files(tmp_path: Path) -> None:
+    (tmp_path / "nsch_2024_topical.dta").touch()
+    (tmp_path / "nsch_2024e_topical.dta").touch()
+    (tmp_path / "nsch_2024_topical.do").touch()
+
+    with pytest.raises(ValueError, match=r"2024"):
+        get_all_years(data_path=tmp_path, download=False)
