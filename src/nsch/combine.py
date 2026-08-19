@@ -55,7 +55,7 @@ def apply_do_labels(
     >>> define_lf = pl.LazyFrame(
     ...     {
     ...         "variable": ["sc_sex"] * 5,
-    ...         "value": ["1", "2", "m", "n", "d"],
+    ...         "value": ["1", "2", ".m", ".n", ".d"],
     ...         "desc": [
     ...             "Male",
     ...             "Female",
@@ -132,12 +132,13 @@ def apply_do_labels(
     # valid Enum category.
     override_label_cols = [lc for _, lc, _ in mapped_cols if lc]
     override_values: dict[str, set[str]] = {}
+    # Collapse each override label column into a list, then unpack to prevent failures on
+    # series of different lenghths
     if override_label_cols:
         distinct_df = lf.select(
-            pl.col(lc).drop_nulls().unique() for lc in override_label_cols
+            pl.col(lc).drop_nulls().unique().implode() for lc in override_label_cols
         ).collect()
-        override_values = {lc: set(distinct_df[lc].to_list()) for lc in override_label_cols}
-
+        override_values = {lc: set(distinct_df[lc][0]) for lc in override_label_cols}
     exprs: list[pl.Expr] = []
     label_cols_to_drop: list[str] = []
 
