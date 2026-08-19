@@ -4,35 +4,61 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import polars as pl
 import pyreadstat
 
 import nsch._types as types
-
-if TYPE_CHECKING:
-    from nsch._types import DoSpec
+from nsch._types import DoSpec
 
 __all__ = ["parse_do", "read_nsch_dta"]
 
 
 def parse_do(year_do_path: str | Path) -> DoSpec:
-    """Parse variable and value labels from a Stata do-file."""
-    from nsch._types import DoSpec
+    """Parse variable and value labels from a Stata do-file.
+
+    Parameters
+    ----------
+    year_do_path : str | Path
+        Path to the Stata do-file containing variable and value label definitions.
+
+    Returns
+    -------
+    DoSpec
+        Parsed label metadata containing two LazyFrames. ``var`` contains
+        variable names and descriptions, while ``define`` contains variable
+        names, values, and value descriptions.
+
+    Examples
+    --------
+    Parse the 2024 NSCH topical do-file and inspect the ``a1_active``
+    variable label:
+
+    >>> result = parse_do("nsch_2024_topical.do")
+    >>> result.var.collect().filter(pl.col("variable") == "a1_active")
+    shape: (1, 2)
+    ┌───────────┬───────────────────────┐
+    │ variable  ┆ desc                  │
+    │ ---       ┆ ---                   │
+    │ str       ┆ str                   │
+    ╞═══════════╪═══════════════════════╡
+    │ a1_active ┆ Adult 1 - Active Duty │
+    └───────────┴───────────────────────┘
+    """
 
     path = Path(year_do_path)
 
     if not path.exists():
         raise FileNotFoundError(
-            "year.do.path should be the path to a Stata do file, "
+            "year_do_path should be the path to a Stata do file, "
             f"but this file does not exist: {path}"
         )
 
     variable_rows: list[dict[str, str]] = []
     define_rows: list[dict[str, str]] = []
 
-    for line in path.read_text().splitlines():
+    # The 2024 NSCH topical do-file was verified to be UTF-8 compatible.
+    for line in path.read_text(encoding="utf-8").splitlines():
         variable_match = re.match(
             r'^\s*label\s+var\s+(\S+)\s+"([^"]*)"',
             line,

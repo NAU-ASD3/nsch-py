@@ -17,7 +17,7 @@ def test_parse_do_raises_error_for_missing_file(tmp_path: Path) -> None:
 
     with pytest.raises(
         FileNotFoundError,
-        match=r"year\.do\.path should be the path to a Stata do file",
+        match="year_do_path should be the path to a Stata do file",
     ):
         parse_do(missing_file)
 
@@ -60,6 +60,66 @@ def test_parse_do_parses_value_labels(tmp_path: Path) -> None:
     )
 
     assert_frame_equal(result.define.collect(), expected)
+
+
+def test_parse_do_preserves_dotted_missing_values(tmp_path: Path) -> None:
+    """Preserve dotted Stata missing values in label definitions."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+        'label define SC_SEX_lab .m "No valid response"\n'
+        'label define SC_SEX_lab .d "Suppressed"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX", "SC_SEX", "SC_SEX"],
+            "value": ["1", "2", ".m", ".d"],
+            "desc": [
+                "Male",
+                "Female",
+                "No valid response",
+                "Suppressed",
+            ],
+        }
+    )
+
+    assert_frame_equal(result.define.collect(), expected)
+
+
+def test_parse_do_ignores_non_label_lines(tmp_path: Path) -> None:
+    """Ignore non-label lines in a Stata do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        "/* 06062025 */\n"
+        "*************************************************************\n"
+        'local file = "<<INSERT FILE DIRECTORY>>"\n'
+        'use "nsch_2024e_topical", clear\n'
+        'label var a1_active "Adult 1 - Active Duty"\n'
+        'label define a1_active_lab 1 "Never served in the military"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected_var = pl.DataFrame(
+        {
+            "variable": ["a1_active"],
+            "desc": ["Adult 1 - Active Duty"],
+        }
+    )
+    expected_define = pl.DataFrame(
+        {
+            "variable": ["a1_active"],
+            "value": ["1"],
+            "desc": ["Never served in the military"],
+        }
+    )
+
+    assert_frame_equal(result.var.collect(), expected_var)
+    assert_frame_equal(result.define.collect(), expected_define)
 
 
 def test_parse_do_returns_variable_and_value_labels(tmp_path: Path) -> None:
