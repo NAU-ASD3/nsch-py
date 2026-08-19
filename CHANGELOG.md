@@ -10,7 +10,7 @@ so each version stays unique and the date stays honest.
 
 ## 2026.8.3 (PR#66)
 
-- Added `get_nsch_index` for readin NSCH index page and getting links to each dataset
+- Added `get_nsch_index` for reading NSCH index page and getting links to each dataset
 - Added `get_year` to read one year's NSCH STATA `.dta` and `.do` files
 - Added `get_all_years` to create a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
 

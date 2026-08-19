@@ -1,6 +1,6 @@
 [project]
 name = "nsch"
-version = "2026.8.3"
+version = "2026.8.18"
 description = "NSCH data preparation toolkit: download, harmonize, and combine National Survey of Children's Health data across years."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -56,8 +56,8 @@ dev = [
     "pre-commit>=4.6.1",
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
-    "requests-mock>=1.12.1",
     "types-requests>=2.33.0.20260712",
+    "respx>=0.23.1",
 ]
 
 # --- Ruff (lint + format) -------------------------------------------------
