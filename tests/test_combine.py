@@ -7,10 +7,6 @@ from polars.testing import assert_frame_equal, assert_series_equal
 
 from nsch.combine import apply_do_labels
 
-# NOTE: Tagged missing values are just the raw letter rather than with the leading.
-# because this is how pyreadstat.read_dta() will read them in. Worth checking against the
-# result of parse_do
-
 
 def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
     lf = pl.LazyFrame({"sc_sex": [1, 2, 1, 2]})
@@ -151,6 +147,77 @@ def test_provided_alias_map_is_used() -> None:
                     "Two parents (at least one not biological/adoptive), currently married",
                 ]
             )
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
+    # a frame with two transformed columns, each with its own _label overrides with a
+    # different number of distinct override values (Non-None length differs)
+    lf = pl.LazyFrame(
+        {
+            "birthwt": [1, 996, 996],
+            "birthwt_label": ["Custom VLB Label", None, None],
+            "family": [4, 5, 6],
+            "family_label": [
+                "Two biogical/adoptive parents, currently married",
+                "Two biogical/adoptive parents, not currently married",
+                "Two parents (at least one not biological/adoptive), currently married",
+            ],
+        }
+    )
+    define_lf = pl.LazyFrame(
+        {
+            "variable": [
+                "birthwt",
+                "birthwt",
+                "birthwt",
+                "birthwt",
+                "family",
+                "family",
+                "family",
+                "family",
+            ],
+            "value": ["1", "2", "3", ".m", "4", "5", "6", ".d"],
+            "desc": [
+                "Very low birth weight",
+                "Low birth weight",
+                "Not low birth weight",
+                "No valid response",
+                "Two biogical/adoptive parents, currently married",
+                "Two biogical/adoptive parents, not currently married",
+                "Two parents (at least one not biological/adoptive), currently married",
+                "Suppressed for Confidentiality",
+            ],
+        }
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {
+            "birthwt": ["Custom VLB Label", None, None],
+            "family": [
+                "Two biogical/adoptive parents, currently married",
+                "Two biogical/adoptive parents, not currently married",
+                "Two parents (at least one not biological/adoptive), currently married",
+            ],
+        },
+        schema={
+            "birthwt": pl.Enum(
+                [
+                    "Very low birth weight",
+                    "Low birth weight",
+                    "Not low birth weight",
+                    "Custom VLB Label",
+                ]
+            ),
+            "family": pl.Enum(
+                [
+                    "Two biogical/adoptive parents, currently married",
+                    "Two biogical/adoptive parents, not currently married",
+                    "Two parents (at least one not biological/adoptive), currently married",
+                ]
+            ),
         },
     )
     assert_frame_equal(result, expected)
