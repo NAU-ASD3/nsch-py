@@ -9,6 +9,46 @@ from nsch._types import STATA_TAG_TO_SENTINEL, TaggedNA
 __all__ = ["apply_do_labels"]
 
 
+def _scan_override_labels(
+    lf: pl.LazyFrame, label_cols: list[tuple[str, str | None, dict[float, str]]]
+) -> dict[str, set[str]]:
+    """Helper function for ``apply_do_labels`` that scans the ``lf`` for override label values
+    present in each ``_label`` column. A label introduced only from the override rather than from
+    the ``.do`` file will map to a valid ``pl.Enum`` category.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        The frame of raw numeric survey data ingested by ``apply_do_labels``.
+
+    label_cols : list[tuple[str, str|None, dict[float, str]]]
+        A mapping between the column name, label name, and lookup label name
+        created within ``apply_do_labels``
+
+    Returns
+    -------
+    A dict[str, set[str]] containing the set of labels associated with an
+    override label for conversion into ``pl.Enum`` in ``apply_do_labels``
+
+    Notes
+    -----
+    The ``.collect()`` call is deliberate. The function has to peek at the actual to see which
+    override labels really occur in each _label column before building any expressions. This is
+    still relatively cheap as the "projection pushdown" of ``polars`` means only the ``_label``
+    columns get read, not the whole frame.
+    """
+    override_label_cols = [lc for _, lc, _ in label_cols if lc]
+    override_values: dict[str, set[str]] = {}
+    # Collapse each override label column into a list, then unpack to prevent failures on
+    # series of different lenghths
+    if override_label_cols:
+        distinct_df = lf.select(
+            pl.col(lc).drop_nulls().unique().implode() for lc in override_label_cols
+        ).collect()
+        override_values = {lc: set(distinct_df[lc][0]) for lc in override_label_cols}
+    return override_values
+
+
 def apply_do_labels(
     lf: pl.LazyFrame, define_lf: pl.LazyFrame, alias: dict[str, str] | None = None
 ) -> pl.LazyFrame:
@@ -18,7 +58,7 @@ def apply_do_labels(
     dtype and sentinal codes (996-999) become ``None`` (null). If a ``_label`` companion column
     exists (created by ``transform_values``), those labels override the ``.do``-derived labels
     for matching rows, and the companion column is removed. Columns with no matching ``define``
-    entries are left numeric, but sentinel codes are still replaced with ``None``.
+    entries are left numeric, but `_types_TaggedNA` codes are still replaced with ``None``.
 
     When a column's name in ``lf`` differs from the variable name in ``define_lf`` because an
     upstream ``rename_vars`` or ``merge_vars`` change the column name, pass an ``alias`` map so
@@ -36,7 +76,7 @@ def apply_do_labels(
         Contains the value-to-label mapping for each survey variable.
 
     alias : dict[str, str]
-        An optional list mapping a column name in ``lf`` to the
+        An optional dict mapping a column name in ``lf`` to the
         variable name to look up in ``define_lf``. Used by ``harmonize_year``
         to handle columns whose names changed via ``rename_vars`` or ``merge_vars``
         from ``nsch.harmonize``. For example, {"family" : "family_r"} tells this
@@ -127,18 +167,8 @@ def apply_do_labels(
         elif schema[col].is_numeric():
             plain_numeric_cols.append(col)
 
-    # Scan the data once for override label values actually present in each _label column,
-    # so a label introduced only via override rather than in the .do will still map to a
-    # valid Enum category.
-    override_label_cols = [lc for _, lc, _ in mapped_cols if lc]
-    override_values: dict[str, set[str]] = {}
-    # Collapse each override label column into a list, then unpack to prevent failures on
-    # series of different lenghths
-    if override_label_cols:
-        distinct_df = lf.select(
-            pl.col(lc).drop_nulls().unique().implode() for lc in override_label_cols
-        ).collect()
-        override_values = {lc: set(distinct_df[lc][0]) for lc in override_label_cols}
+    override_values = _scan_override_labels(lf, mapped_cols)
+
     exprs: list[pl.Expr] = []
     label_cols_to_drop: list[str] = []
 
