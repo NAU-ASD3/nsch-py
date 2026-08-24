@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.8.24 (PR#NN)
+
+- Update `.pre-commit-config.yaml` to use local project dependencies in mypy hooks rather than its own manually-scoped venv
+
 ## 2026.8.13 (PR#59)
 
 - Added `read_nsch_dta` and  `readers.py` module for ingesting data and handling tagged NAs
