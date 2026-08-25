@@ -11,8 +11,26 @@ to null at the very end. See ``docs/design-decisions.md`` for the full rationale
 """
 
 from enum import IntEnum
+from typing import NamedTuple
 
-__all__ = ["TaggedNA"]
+import polars as pl
+
+__all__ = ["DoSpec", "TaggedNA"]
+
+
+class DoSpec(NamedTuple):
+    """Label metadata parsed from a Stata do-file.
+
+    Attributes
+    ----------
+    define
+        Value-label definitions parsed from ``label define`` statements.
+    var
+        Variable descriptions parsed from ``label var`` statements.
+    """
+
+    define: pl.LazyFrame
+    var: pl.LazyFrame
 
 
 class TaggedNA(IntEnum):
