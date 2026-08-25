@@ -32,7 +32,7 @@ def _scan_override_labels(
 
     Notes
     -----
-    The ``.collect()`` call is deliberate. The function has to peek at the actual to see which
+    The ``.collect()`` call is deliberate. The function has to peek at the actual data to see which
     override labels really occur in each _label column before building any expressions. This is
     still relatively cheap as the "projection pushdown" of ``polars`` means only the ``_label``
     columns get read, not the whole frame.
@@ -40,7 +40,7 @@ def _scan_override_labels(
     override_label_cols = [lc for _, lc, _ in label_cols if lc]
     override_values: dict[str, set[str]] = {}
     # Collapse each override label column into a list, then unpack to prevent failures on
-    # series of different lenghths
+    # series of different lengths
     if override_label_cols:
         distinct_df = lf.select(
             pl.col(lc).drop_nulls().unique().implode() for lc in override_label_cols
@@ -55,10 +55,10 @@ def apply_do_labels(
     """Converts numeric columns in a ``pl.LazyFrame`` to the ``Polars`` Enum dtype using
     label definitions ``define`` table in the ``DoSpec`` from ``parse_do()``. For each variable
     present in both ``lf`` and ``define_lf``, real value codes are mapped to ``Polars`` Enum
-    dtype and sentinal codes (996-999) become ``None`` (null). If a ``_label`` companion column
+    dtype and sentinel codes (996-999) become ``None`` (null). If a ``_label`` companion column
     exists (created by ``transform_values``), those labels override the ``.do``-derived labels
     for matching rows, and the companion column is removed. Columns with no matching ``define``
-    entries are left numeric, but `_types_TaggedNA` codes are still replaced with ``None``.
+    entries are left numeric, but `TaggedNA` codes are still replaced with ``None``.
 
     When a column's name in ``lf`` differs from the variable name in ``define_lf`` because an
     upstream ``rename_vars`` or ``merge_vars`` change the column name, pass an ``alias`` map so
