@@ -7,6 +7,10 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
+## 2026.8.26 (PR#NN)
+
+- Added `merge_vars` for per-column merges based on the config.
+
 ## [2026.6.22] - 2026-06-22
 
 - Added `rename_vars` for per-year column renaming (#32)
