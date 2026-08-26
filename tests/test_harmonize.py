@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import polars as pl
-from polars.testing import assert_frame_equal
-
 import warnings
 
+import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from nsch.harmonize import (
+    MergeRule,
     RenameRule,
     TransformValues,
+    merge_vars,
     rename_vars,
     subset_vars,
     transform_values,
-  MergeRule,
-  merge_vars
 )
 
 
@@ -174,6 +173,7 @@ def test_warning_for_missing_desired_subset_variable():
         subset_vars(df, ["a", "x"])
 
 
+# tests for rename_vars
 def test_renames_a_column_for_a_matching_year() -> None:
     lf = pl.LazyFrame({"gowhensick": [1, 2, 3], "hhid": [10, 20, 30]})
     renames: dict[str, RenameRule] = {
@@ -221,12 +221,13 @@ def test_applies_several_rules_in_one_call() -> None:
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["k4q02_r", "family", "hhid"]
 
-    def test_empty_renames_leaves_the_frame_unchanged() -> None:
+
+def test_empty_renames_leaves_the_frame_unchanged() -> None:
     lf = pl.LazyFrame({"hhid": [1, 2]})
     result = rename_vars(lf, {}, 2023).collect()
     assert_frame_equal(result, pl.DataFrame({"hhid": [1, 2]}))
 
-# tests for rename_vars
+
 def test_renames_are_applied_simultaneously_not_chained() -> None:
     # R renames in a loop, so these two rules cascade there and gowhensick
     # ends up as k4q02_r. Here both rules read the original names, so each
@@ -256,6 +257,7 @@ def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
     renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
     with pytest.raises(ValueError, match="existing columns"):
         rename_vars(lf, renames, 2023)
+
 
 # Tests for merge_vars
 def test_merges_preferred_colums() -> None:
@@ -328,12 +330,15 @@ def test_missing_source_columns_are_silently_skipped() -> None:
 
 
 def test_non_logical_skip_does_not_use_fallback_value() -> None:
-    lf = pl.LazyFrame({"col_a": [996, 997, 998, 999], "col_b": [2, 3, 4, 5]})
+    # also makes sure columns not mentioned in mergeRule are not changed
+    lf = pl.LazyFrame(
+        {"col_a": [996, 997, 998, 999], "col_b": [2, 3, 4, 5], "col_c": [0.01, 0.02, 0.03, 0.04]}
+    )
     merges: dict[str, MergeRule] = {
         "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
     }
     result = merge_vars(lf, merges, 2016)
-    expected = pl.LazyFrame({"merged": [996, 997, 4, 999]})
+    expected = pl.LazyFrame({"col_c": [0.01, 0.02, 0.03, 0.04], "merged": [996, 997, 4, 999]})
     assert_frame_equal(result, expected)
 
 
@@ -345,5 +350,3 @@ def test_non_matching_year() -> None:
     }
     result = merge_vars(lf, merges, 2017)
     assert_frame_equal(result, lf)
-    expected = pl.DataFrame({"k4q02_r": [1], "family": [2], "hhid": [3]})
-    assert_frame_equal(result, expected)

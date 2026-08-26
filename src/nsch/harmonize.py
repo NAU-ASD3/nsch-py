@@ -9,7 +9,15 @@ import polars as pl
 
 from nsch import _types
 
-__all__ = ["RenameRule", "TransformValues", "rename_vars", "subset_vars", "transform_values", "MergeRule", "merge_vars"]
+__all__ = [
+    "MergeRule",
+    "RenameRule",
+    "TransformValues",
+    "merge_vars",
+    "rename_vars",
+    "subset_vars",
+    "transform_values",
+]
 
 
 class RenameRule(TypedDict):
@@ -18,15 +26,15 @@ class RenameRule(TypedDict):
     years: list[str]
     new_name: str
 
-      
+
 class MergeRule(TypedDict):
     """One merge rule with its applicable years and source columns."""
 
     years: list[str]
     column_preferred: str
     column_fallback: str
-      
-      
+
+
 class TransformValues(TypedDict):
     """One transform rule: the years and values it applies to, and the new values and labels."""
 
@@ -102,7 +110,6 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
         old_label = f"{old}_label"
         if old_label in present:
             mapping[old_label] = f"{new_name}_label"
-    return lf.rename(mapping)
 
     # Two rules pointing at the same name would silently collapse two columns
     # into one, so catch it here where we can name the year and the columns.
@@ -292,12 +299,8 @@ def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
     keep = present + label_cols
     return lf.select(keep)
 
-  
-def merge_vars(
-    lf: pl.LazyFrame,
-    merges: dict[str, MergeRule],
-    year: int,
-) -> pl.LazyFrame:
+
+def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.LazyFrame:
     """Merge preferred and fallback columns for a survey year.
 
     The preferred column is normally used. The fallback column is used when
@@ -307,6 +310,48 @@ def merge_vars(
     the same preferred-versus-fallback condition.
 
     Original value and label columns are removed after merging.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        A polars LazyFrame with the columns to merge.
+    merges : dict[str, MergeRule]
+        A named dictionary containing a Merge Rule and Year from the ``.json`` config file.
+        This structure defines the mapping between the preferred and fallback columns
+        for a given year.
+    year : int
+        The year of data on which to perform the merge.
+
+    Returns
+    -------
+    A pl.LazyFrame containing the merged column and its associated ``_label`` column, if present,
+    as well as any other untouched columns. The original preferred and fallback columns are removed.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame(
+    ...     {"gowhensick": [1, 2, 3, 4], "k4q02_r": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
+    ... )
+    >>> merges: dict[str, MergeRule] = {
+    ...     "gowhensick_merged": {
+    ...         "years": ["2023"],
+    ...         "column_preferred": "k4q02_r",
+    ...         "column_fallback": "gowhensick",
+    ...     }
+    ... }
+    >>> merge_vars(lf, merges, 2023).collect()
+    shape: (4, 2)
+    ┌──────┬───────────────────┐
+    │ hhid ┆ gowhensick_merged │
+    │ ---  ┆ ---               │
+    │ i64  ┆ i64               │
+    ╞══════╪═══════════════════╡
+    │ 5    ┆ 1                 │
+    │ 6    ┆ 2                 │
+    │ 7    ┆ 3                 │
+    │ 8    ┆ 4                 │
+    └──────┴───────────────────┘
     """
 
     merged_lf = lf
