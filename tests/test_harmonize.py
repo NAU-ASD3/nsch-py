@@ -54,8 +54,6 @@ def test_applies_several_rules_in_one_call() -> None:
 
 
 # Tests for merge_vars
-
-
 def test_merges_preferred_colums() -> None:
     lf = pl.LazyFrame(
         {"gowhensick": [1, 2, 3, 4], "k4q02_r": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
@@ -79,7 +77,6 @@ def test_merges_preferred_colums() -> None:
     assert_frame_equal(expected, result)
 
 
-# Test label columns are also merged
 def test_merges_label_columns() -> None:
     lf = pl.LazyFrame(
         {"a": [1, None], "b": [None, 2], "a_label": ["One", None], "b_label": [None, "Two"]}
@@ -126,7 +123,6 @@ def test_missing_source_columns_are_silently_skipped() -> None:
     assert_frame_equal(lf, result)
 
 
-# Test non-logical skip values (sentinals that are not 998) do NOT use the fallback value
 def test_non_logical_skip_does_not_use_fallback_value() -> None:
     lf = pl.LazyFrame({"col_a": [996, 997, 998, 999], "col_b": [2, 3, 4, 5]})
     merges: dict[str, MergeRule] = {
@@ -144,6 +140,4 @@ def test_non_matching_year() -> None:
         "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
     }
     result = merge_vars(lf, merges, 2017)
-    # TODO: Finish the expected lazy frame to match what we actually plan to test
-    expected = pl.LazyFrame({"merged": [996, 997, 4, 999]})
-    assert_frame_equal(result, expected)
+    assert_frame_equal(result, lf)
