@@ -57,7 +57,7 @@ step." It is to not have a CSV step.
 
 ### The decision
 
-`src/nsch/read.read_dta` reads `.dta` files directly with a Stata-aware
+`src/nsch/read.read_nsch_dta` reads `.dta` files directly with a Stata-aware
 reader (`pyreadstat`; see §3) and rewrites the four tags to integer
 sentinels that the rest of the pipeline carries through unchanged (see
 §4). `src/nsch/read.parse_do` reads the matching `.do` file to recover the
@@ -152,23 +152,23 @@ object it returns alongside the DataFrame:
 ```python
 import pyreadstat
 
-df, meta = pyreadstat.read_dta("nsch_2024_topical.dta", user_missing=True)
+df, meta = pyreadstat.read_dta("nsch_2024_topical.dta", user_missing=True, output_format="polars")
 
 # A column that had values 1, 2, .m, .n, .l, .d in Stata now looks like:
-#   df["k2q01_d"]  ->  [1.0, 2.0, "a", "b", "c", "d"]
+#   df["k2q01_d"]  ->  [1.0, 2.0, "m", "n", "l", "d"]
 # meta.missing_user_values["k2q01_d"] gives the letter -> tag mapping.
 ```
 
-`src/nsch/read.read_dta` consumes this output and rewrites the letter
+`src/nsch/read.read_nsch_dta` consumes this output and rewrites the letter
 markers to the integer sentinels described in §4. The rewrite happens in
 one private helper inside `read.py`; the rest of the pipeline sees the
 column as plain numeric data:
 
 ```python
-def read_dta(path: Path) -> pl.LazyFrame:
-    df_pd, meta = pyreadstat.read_dta(str(path), user_missing=True)
+def read_nsch_dta(path: Path) -> pl.LazyFrame:
+    df_pd, meta = pyreadstat.read_dta(str(path), user_missing=True, output_format="polars")
     # _rewrite_tagged_na uses meta.missing_user_values to map
-    # "a"/"b"/"c"/"d" -> 996/997/998/999 per column.
+    # "m"/"n"/"l"/"d" -> 996/997/998/999 per column.
     return _rewrite_tagged_na(pl.from_pandas(df_pd).lazy(), meta)
 ```
 
@@ -187,7 +187,7 @@ This is the only place in the package where mypy strictness is relaxed.
 
 ## 4. The 996/997/998/999 sentinel-code scheme
 
-Once `read_dta` has the four tagged-NA markers in hand, the package needs
+Once `read_nsch_dta` has the four tagged-NA markers in hand, the package needs
 a representation that survives the rest of the pipeline. Three options
 were considered: four boolean companion columns per variable, a single
 string column per variable encoding the tag as `"m"` / `"n"` / `"l"` /
@@ -234,7 +234,7 @@ three-digit codes, the relevant config rules avoid colliding with
 ### Lifecycle of a tag
 
 A tagged value moves through the pipeline as follows: Stata source
-contains `.m`; `read.read_dta` rewrites it to `996` and the column
+contains `.m`; `readers.read_nsch_dta` rewrites it to `996` and the column
 becomes plain `Int64`/`Float64`; the harmonize stages
 (`transform_values`, `rename_vars`, `merge_vars`, `subset_vars`) treat
 `996` as an ordinary value; `apply_do_labels` converts the variable to a

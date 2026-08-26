@@ -1,0 +1,281 @@
+"""Tests for Validate module"""
+
+from __future__ import annotations
+
+import polars as pl
+import pytest
+from polars.testing import assert_frame_equal
+
+from nsch.validate import check_label_consistency, check_na_rates, check_year_coverage
+
+# Testing For ``check_label_consistency``
+
+
+def test_detects_inconsistent_levels_across_years() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2016, 2017, 2017],
+            "status": pl.Series(["A", "B", "A", "C"], dtype=pl.Enum(["A", "B", "C"])),
+        }
+    )
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["status"],
+            "is_consistent": [False],
+            "n_level_sets": [2],
+            "levels_by_year": ["2016={A|B}; 2017={A|C}"],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_consistent_levels_across_years_returns_true() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2016, 2017, 2017],
+            "status": pl.Series(["A", "B", "A", "B"], dtype=pl.Enum(["A", "B"])),
+        }
+    )
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["status"],
+            "is_consistent": [True],
+            "n_level_sets": [1],
+            "levels_by_year": ["2016={A|B}; 2017={A|B}"],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_skips_non_enum_columns() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2017],
+            "x": [1.0, 2.0],
+            "status": pl.Series(["A", "A"], dtype=pl.Enum(["A"])),
+        }
+    )
+    result = check_label_consistency(df)
+    assert result["variable"].to_list() == ["status"]
+
+
+def test_returns_typed_empty_dataframe_when_no_enum_columns() -> None:
+    df = pl.DataFrame({"year": [2016, 2017], "x": [1, 2]})
+    result = check_label_consistency(df)
+    expected = pl.DataFrame(
+        {"variable": [], "is_consistent": [], "n_level_sets": [], "levels_by_year": []},
+        schema={
+            "variable": pl.Utf8,
+            "is_consistent": pl.Boolean,
+            "n_level_sets": pl.Int64,
+            "levels_by_year": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_missing_year_column_raises_value_error_for_label_consistency() -> None:
+    df = pl.DataFrame({"status": pl.Series(["A", "B"], dtype=pl.Enum(["A", "B"]))})
+    with pytest.raises(ValueError, match="year"):
+        check_label_consistency(df)
+
+
+def test_non_polars_dataframe_raises_type_error_when_checking_label_consistency() -> None:
+    df_check_labels = {"year": [2016, 2017], "status": ["A", "B"]}
+    with pytest.raises(TypeError, match="polars DataFrame"):
+        check_label_consistency(df_check_labels)
+
+
+# Testing For ``check_year_coverage``
+
+
+def test_correct_output_format_and_missing_years() -> None:
+    # Checks the output format (column names and DataFrame type).
+    # Flags variables that are entirely missing for one or more years.
+    # Verifies that a fully covered variable has at least one non-missing
+    # value in every year present in the data.
+    df = pl.DataFrame(
+        {
+            "year": ["2016", "2016", "2017", "2017", "2018", "2018"],
+            "x": [1, 2, 3, 4, 5, 6],
+            "y": [1, 2, None, None, None, None],
+        }
+    )
+    result = check_year_coverage(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y"],
+            "n_years_data": [3, 1],
+            "n_years_total": [3, 3],
+            "missing_years": ["", "2017,2018"],
+        }
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_contains_year_column() -> None:
+    df = pl.DataFrame({"x": [1, 2]})
+    with pytest.raises(ValueError, match="year"):
+        check_year_coverage(df)
+
+
+def test_null_year_raises_value_error() -> None:
+    # Safeguards against missingness from earlier in the pipeline
+    df = pl.DataFrame({"year": ["2016", None, "2017"], "x": [1, 2, 3]})
+    with pytest.raises(ValueError, match="year"):
+        check_year_coverage(df)
+
+
+def test_identifies_variable_entirely_NA_in_one_year() -> None:
+    df = pl.DataFrame(
+        {"year": ["2016", "2016", "2017", "2017"], "x": [1, 2, 3, 4], "y": [1, 2, None, None]}
+    )
+    result = check_year_coverage(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y"],
+            "n_years_data": [2, 1],
+            "n_years_total": [2, 2],
+            "missing_years": ["", "2017"],
+        }
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_empty_dataframe_returns_typed_empty_dataframe() -> None:
+    # Returns a typed empty DataFrame with the canonical four columns
+    # and their declared dtypes when no variables are present.
+    df = pl.DataFrame({"year": ["2016", "2017"]})
+    result = check_year_coverage(df)
+    assert isinstance(result, pl.DataFrame)
+    assert set(result.columns) == {"variable", "n_years_data", "n_years_total", "missing_years"}
+    assert result.schema == {
+        "variable": pl.Utf8,
+        "n_years_data": pl.Int64,
+        "n_years_total": pl.Int64,
+        "missing_years": pl.Utf8,
+    }
+    assert result.is_empty()
+
+
+def test_dataframe_with_empty_variable_column_returns_zero_values() -> None:
+    # Returns zero values for a DataFrame with an empty variable column
+    df = pl.DataFrame({"year": [], "x": []})
+    result = check_year_coverage(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["x"],
+            "n_years_data": [0],
+            "n_years_total": [0],
+            "missing_years": [""],
+        }
+    )
+    assert_frame_equal(result, expected)
+
+
+# Testing For ``check_na_rates``
+def test_computes_correct_NA_rates_per_year() -> None:
+    df = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
+    )
+    result = check_na_rates(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y", "x", "y"],
+            "year": [2016, 2016, 2017, 2017],
+            "na_rate": [0.5, 1.0, 0.0, 0.0],
+            "n_total": [2, 2, 2, 2],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "na_rate": pl.Float64,
+            "n_total": pl.Int64,
+        },
+    )
+    # Ensure frames are comparing the correct rows to each other
+    assert_frame_equal(result.sort(by=["variable", "year"]), expected.sort(by=["variable", "year"]))
+
+
+def test_computes_correct_NA_rates_per_year_on_mixed_data() -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016, 2016, 2017, 2017],
+            "x": pl.Series(["a", None, "c", "d"], dtype=pl.Enum(["a", "b", "c", "d"])),
+            "y": [None, None, 5, 6],
+        }
+    )
+    result = check_na_rates(df)
+    expected = pl.DataFrame(
+        {
+            "variable": ["x", "y", "x", "y"],
+            "year": [2016, 2016, 2017, 2017],
+            "na_rate": [0.5, 1.0, 0.0, 0.0],
+            "n_total": [2, 2, 2, 2],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "na_rate": pl.Float64,
+            "n_total": pl.Int64,
+        },
+    )
+    # Ensure frames are comparing the correct rows to each other
+    assert_frame_equal(result.sort(by=["variable", "year"]), expected.sort(by=["variable", "year"]))
+
+
+# Output should have a column named year, but year should not be treated as a variable
+def test_excludes_year_column_from_variables_in_output() -> None:
+    # Schema is not important here for checking data types, we are not comparing values
+    df = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "x": [1, None, 3, 4], "y": [None, None, 5, 6]}
+    )
+    result = check_na_rates(df)
+    assert "year" not in result["variable"].unique()
+
+
+def test_returns_typed_empty_dataframe_when_no_variables() -> None:
+    df = pl.DataFrame({"year": [2016, 2016, 2017, 2017]})
+    result = check_na_rates(df)
+    expected = pl.DataFrame(
+        {"variable": [], "year": [], "na_rate": [], "n_total": []},
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "na_rate": pl.Float64,
+            "n_total": pl.Int64,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_non_polars_dataframe_raises_type_error_when_checking_na_rates() -> None:
+    df_check_na = {"year": [2016, 2017], "x": [1, 2]}
+    with pytest.raises(TypeError, match="polars DataFrame"):
+        check_na_rates(df_check_na)
+
+
+def test_non_polars_dataframe_raises_type_error_when_checking_coverage() -> None:
+    df_check_coverage = {"year": ["2016", "2016"], "x": [1, 2]}
+    with pytest.raises(TypeError, match="polars DataFrame"):
+        check_year_coverage(df_check_coverage)
+
+
+def test_missing_year_column_raises_value_error() -> None:
+    df = pl.DataFrame({"x": [1, 2]})
+    with pytest.raises(ValueError, match="year"):
+        check_na_rates(df)

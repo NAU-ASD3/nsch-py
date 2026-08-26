@@ -81,7 +81,9 @@ def test_values_are_remapped_for_matching_year():
     transforms = {
         "k2q01_d": {
             "years": ["2016", "2017"],
-            "value": ["2"], "new_value": ["1"], "new_label": ["Yes"],
+            "value": ["2"],
+            "new_value": ["1"],
+            "new_label": ["Yes"],
         }
     }
     result = transform_values(lf, transforms, 2016).collect()
@@ -101,8 +103,8 @@ followed by an explicit list of new files. Check the **Files changed** tab befor
 
 Every PR must include:
 
-- A version bump in `pyproject.toml`. Format: `2026.M.DD` matching today's date.
-- A matching entry in `CHANGELOG.md` under `[Unreleased]`, referencing the PR number.
+- A version bump in `pyproject.toml` to the date the PR lands, format `YYYY.M.DD`. If another PR already used today's date, append a micro segment: `YYYY.M.DD.MICRO` (e.g. the second PR in a day is `2026.6.29.1`, the third `2026.6.29.2`).
+- A matching `CHANGELOG.md` entry: a new `## YYYY.M.DD (PR#NN)` section at the top of the list, with the change as bullets. This mirrors the R package's `NEWS.md`.
 - Complete tests for any new function or behavior.
 - Complete docstrings on any new public API.
 - An update to the mkdocs nav (`mkdocs.yml`) if a new public module is added.

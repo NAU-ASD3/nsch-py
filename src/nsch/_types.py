@@ -11,8 +11,26 @@ to null at the very end. See ``docs/design-decisions.md`` for the full rationale
 """
 
 from enum import IntEnum
+from typing import NamedTuple
 
-__all__ = ["TaggedNA"]
+import polars as pl
+
+__all__ = ["STATA_TAG_TO_SENTINEL", "DoSpec", "TaggedNA"]
+
+
+class DoSpec(NamedTuple):
+    """Label metadata parsed from a Stata do-file.
+
+    Attributes
+    ----------
+    define
+        Value-label definitions parsed from ``label define`` statements.
+    var
+        Variable descriptions parsed from ``label var`` statements.
+    """
+
+    define: pl.LazyFrame
+    var: pl.LazyFrame
 
 
 class TaggedNA(IntEnum):
@@ -69,3 +87,13 @@ class TaggedNA(IntEnum):
     NOT_IN_UNIVERSE = 997  # Stata .n -- respondent outside the question's universe
     LOGICAL_SKIP = 998  # Stata .l -- skipped by design because of a prior answer
     SUPPRESSED = 999  # Stata .d -- withheld for confidentiality
+
+
+# Mapping of character STATA tags to Enum values for use in other modules
+# See `TaggedNA` for further descriptions for these tags
+STATA_TAG_TO_SENTINEL = {
+    ".m": TaggedNA.NO_RESPONSE,
+    ".n": TaggedNA.NOT_IN_UNIVERSE,
+    ".l": TaggedNA.LOGICAL_SKIP,
+    ".d": TaggedNA.SUPPRESSED,
+}
