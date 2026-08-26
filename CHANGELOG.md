@@ -7,7 +7,7 @@ Versions follow a date-based scheme: `YYYY.M.DD`.
 
 ## [Unreleased]
 
-## 2026.8.26 (PR#NN)
+## 2026.8.26 (PR#73)
 
 - Added `merge_vars` for per-column merges based on the config.
 
