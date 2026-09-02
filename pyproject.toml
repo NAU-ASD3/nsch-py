@@ -56,7 +56,6 @@ dev = [
     "pre-commit>=4.6.2",
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
-    "types-requests>=2.33.0.20260712",
     "respx>=0.23.1",
 ]
 
