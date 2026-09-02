@@ -10,7 +10,7 @@ import httpx
 import polars as pl
 import pytest
 
-from nsch.acquire import get_all_years, get_nsch_index, get_year, nsch_data_url, nsch_url_prefix
+from nsch.acquire import NSCH_DATA_URL, NSCH_URL_PREFIX, get_all_years, get_nsch_index, get_year
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,11 +24,12 @@ def test_get_nsch_index_creates_index_file_and_removes_duplicates(
     tmp_path: Path, respx_mock
 ) -> None:
     fake_index_html = (
-        f'<a href="{nsch_url_prefix}2016.html">2016</a>'
-        f'<a href="{nsch_url_prefix}2017.html">2017</a>'
-        f'<a href="{nsch_url_prefix}2017.html">2017 duplicate</a>'
+        f'<a href="{NSCH_URL_PREFIX}2016.html">2016</a>'
+        f'<a href="{NSCH_URL_PREFIX}2017.html">2017</a>'
+        f'<a href="{NSCH_URL_PREFIX}2017.html">2017 duplicate</a>'
     )
-    respx_mock.get(nsch_data_url).respond(text=fake_index_html)
+
+    respx_mock.get(NSCH_DATA_URL).respond(text=fake_index_html)
 
     html_path = tmp_path / "index.html"
     result = get_nsch_index(local_html_path=html_path)
@@ -37,6 +38,27 @@ def test_get_nsch_index_creates_index_file_and_removes_duplicates(
     # also asserts years are confined to those listed in the index
     assert sorted(result["year"].to_list()) == [2016, 2017]
     assert result.height == 2
+
+
+def test_get_nsch_index_reaches_out_to_network_when_no_path_given(respx_mock) -> None:
+    fake_index_html = (
+        f'<a href="{NSCH_URL_PREFIX}2016.html">2016</a>'
+        f'<a href="{NSCH_URL_PREFIX}2017.html">2017</a>'
+    )
+
+    route = respx_mock.get(NSCH_DATA_URL).mock(
+        return_value=httpx.Response(200, text=fake_index_html)
+    )
+
+    result = get_nsch_index()
+    print(result)
+
+    # assert a request made to the specified route was actually made
+    assert route.called
+    # make sure exactly one call was made, catches re-downloads
+    assert route.call_count == 1
+    # assert years come back
+    assert sorted(result["year"].to_list()) == [2016, 2017]
 
 
 # Testing functions for get_year
@@ -94,7 +116,7 @@ def test_get_year_raises_error_if_no_zip_links_found(tmp_path: Path, respx_mock)
 
 
 def test_get_year_raises_error_if_more_than_one_zip_link_found(tmp_path: Path, respx_mock) -> None:
-    # Place both links on the same line to make sure we cout regex matches
+    # Place both links on the same line to make sure we count regex matches
     # rather than lines themselves
     create_mock_index_page(respx_mock, hrefs=(ZIP_URL, ZIP_URL))
 
@@ -103,7 +125,6 @@ def test_get_year_raises_error_if_more_than_one_zip_link_found(tmp_path: Path, r
 
 
 def test_get_year_raises_http_error_on_bad_status(tmp_path: Path, respx_mock) -> None:
-    # Uses requests.exceptions.HTTPError path via raise_for_status()
     respx_mock.get(YEAR_URL).respond(403)
     with pytest.raises(httpx.HTTPStatusError):
         get_year(YEAR_URL, tmp_path)

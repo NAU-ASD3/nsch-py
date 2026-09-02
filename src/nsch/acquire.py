@@ -1,4 +1,4 @@
-"""Functions for the Acquire layer"""
+"""Functions for the acquire layer"""
 
 from __future__ import annotations
 
@@ -12,16 +12,15 @@ import polars as pl
 
 __all__ = ["get_all_years", "get_nsch_index", "get_year"]
 
-nsch_url_prefix = "https://www.census.gov/programs-surveys/nsch/data/datasets."
-nsch_data_url = nsch_url_prefix + "html"
+NSCH_URL_PREFIX = "https://www.census.gov/programs-surveys/nsch/data/datasets."
+NSCH_DATA_URL = NSCH_URL_PREFIX + "html"
 
 
 def get_nsch_index(local_html_path: Path | None = None) -> pl.DataFrame:
     """
-    Download and parse the NSCH index web page to obtain a list
-    of years for which survey data are available.
-    We can then do a loop over years,
-    to download data from each available year.
+    Download and parse the NSCH index web page to obtain a list of years for which
+    survey data are available. We can then do a loop over years, to download data
+    from each available year.
 
     Parameters
     ----------
@@ -30,18 +29,17 @@ def get_nsch_index(local_html_path: Path | None = None) -> pl.DataFrame:
 
     Returns
     -------
-    A pl.DataFrame containing one row per year of data, and columns ``url``, ``year``.
+    A ``pl.DataFrame`` containing one row per year of data, and columns ``url``, ``year``.
     """
     # If no file path is passed for caching, create a temp file
     if local_html_path is None:
-        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
-            local_html_path = Path(tmp.name)
+        local_html_path = Path(tempfile.mkdtemp()) / "nsch_index.html"
 
     local_html_path = Path(local_html_path)
     if not local_html_path.exists():
         # create empty parent directories if they don't exist
         local_html_path.parent.mkdir(parents=True, exist_ok=True)
-        response = httpx.get(nsch_data_url, timeout=30, follow_redirects=True)
+        response = httpx.get(NSCH_DATA_URL, timeout=30, follow_redirects=True)
         response.raise_for_status()
         local_html_path.write_bytes(response.content)
 
@@ -49,7 +47,7 @@ def get_nsch_index(local_html_path: Path | None = None) -> pl.DataFrame:
     html_text = local_html_path.read_text(encoding="utf-8").splitlines()
     # Get html strings with each year, escape special characters
     # name url with group and "url" and, if present, name found digits with the group "year"
-    url_pattern = r"(?P<url>" + re.escape(nsch_url_prefix) + r"(?P<year>[0-9]+)\.html)"
+    url_pattern = r"(?P<url>" + re.escape(NSCH_URL_PREFIX) + r"(?P<year>[0-9]+)\.html)"
 
     # create a dataframe from the url path with:
     # url as a list containing nsch url prefix, year as int, and .html string
@@ -91,8 +89,7 @@ def get_year(
 
     Returns
     -------
-    Path to the resulting download
-
+    A ``Path`` to the resulting download
     """
     # don't need to check if year_url is string, python will pass objects and mypy handles typing
     # same for data_path and verbose
