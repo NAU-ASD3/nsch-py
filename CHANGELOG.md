@@ -8,6 +8,12 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.8.3 (PR#66)
+
+- Added `get_nsch_index` for reading NSCH index page and getting links to each dataset
+- Added `get_year` to read one year's NSCH STATA `.dta` and `.do` files
+- Added `get_all_years` to create a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
+
 ## 2026.8.24.1 (PR#68)
 
 - Added `apply_do_labels` for converting coded values to `pl.Enum` labels from the `DoSpec` produced by `parse_do`, resolving remaining sentinel codes to null.
