@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.8.26 (PR#73)
+
+- Added `merge_vars` for per-column merges based on the config.
+
 ## 2026.8.24.1 (PR#68)
 
 - Added `apply_do_labels` for converting coded values to `pl.Enum` labels from the `DoSpec` produced by `parse_do`, resolving remaining sentinel codes to null.

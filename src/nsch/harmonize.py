@@ -7,7 +7,17 @@ from typing import TypedDict
 
 import polars as pl
 
-__all__ = ["RenameRule", "TransformValues", "rename_vars", "subset_vars", "transform_values"]
+from nsch._types import TaggedNA
+
+__all__ = [
+    "MergeRule",
+    "RenameRule",
+    "TransformValues",
+    "merge_vars",
+    "rename_vars",
+    "subset_vars",
+    "transform_values",
+]
 
 
 class RenameRule(TypedDict):
@@ -15,6 +25,14 @@ class RenameRule(TypedDict):
 
     years: list[str]
     new_name: str
+
+
+class MergeRule(TypedDict):
+    """One merge rule with its applicable years and source columns."""
+
+    years: list[str]
+    column_preferred: str
+    column_fallback: str
 
 
 class TransformValues(TypedDict):
@@ -28,6 +46,12 @@ class TransformValues(TypedDict):
 
 def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> pl.LazyFrame:
     """Rename columns for one survey year according to the rename rules.
+
+    Applies the rename rules for one survey year, turning that
+    year's source column names into the harmonized names the rest of the pipeline
+    expects. It stays lazy: a LazyFrame goes in and a LazyFrame comes out, with no
+    collection. When a column is renamed, its ``_label`` companion is renamed to
+    match, so the value column and its human-readable labels stay paired.
 
     Parameters
     ----------
@@ -274,3 +298,110 @@ def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
     label_cols = [l_col for l_col in label_cols if l_col in lf_variables]
     keep = present + label_cols
     return lf.select(keep)
+
+
+def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.LazyFrame:
+    """Merge preferred and fallback columns for a survey year.
+
+    The preferred column is normally used. The fallback column is used when
+    the preferred value is null or contains the logical skip sentinel, 998.
+
+    If both corresponding ``_label`` columns exist, they are merged using
+    the same preferred-versus-fallback condition.
+
+    Original value and label columns are removed after merging.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        A polars LazyFrame with the columns to merge.
+    merges : dict[str, MergeRule]
+        A named dictionary containing a Merge Rule and Year from the ``.json`` config file.
+        This structure defines the mapping between the preferred and fallback columns
+        for a given year.
+    year : int
+        The year of data on which to perform the merge.
+
+    Returns
+    -------
+    A pl.LazyFrame containing the merged column and its associated ``_label`` column, if present,
+    as well as any other untouched columns. The original preferred and fallback columns are removed.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame(
+    ...     {"hoursleep": [1, 2, 3, 4], "hoursleep05": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
+    ... )
+    >>> merges: dict[str, MergeRule] = {
+    ...     "sleep": {
+    ...         "years": ["2023"],
+    ...         "column_preferred": "hoursleep",
+    ...         "column_fallback": "hoursleep05",
+    ...     }
+    ... }
+    >>> merge_vars(lf, merges, 2023).collect()
+    shape: (4, 2)
+    ┌──────┬───────┐
+    │ hhid ┆ sleep │
+    │ ---  ┆ ---   │
+    │ i64  ┆ i64   │
+    ╞══════╪═══════╡
+    │ 5    ┆ 1     │
+    │ 6    ┆ 2     │
+    │ 7    ┆ 3     │
+    │ 8    ┆ 4     │
+    └──────┴───────┘
+    """
+
+    merged_lf = lf
+    schema = merged_lf.collect_schema()
+    variable_names = set(schema.names())
+
+    for merged_variable_name, details in merges.items():
+        column_preferred = details["column_preferred"]
+        column_fallback = details["column_fallback"]
+        merge_years = details["years"]
+
+        if (
+            str(year) in merge_years
+            and column_preferred in variable_names
+            and column_fallback in variable_names
+        ):
+            preferred_values = pl.col(column_preferred)
+            fallback_values = pl.col(column_fallback)
+
+            use_fallback = (preferred_values.is_null()) | (
+                preferred_values == TaggedNA.LOGICAL_SKIP
+            )
+
+            # No cast to column type or int, polars will infer the type (divergance from R)
+            # protects against mismatching types in columns to merge
+            merged_lf = merged_lf.with_columns(
+                pl.when(use_fallback)
+                .then(fallback_values)
+                .otherwise(preferred_values)
+                .alias(merged_variable_name)
+            )
+
+            label_preferred = column_preferred + "_label"
+            label_fallback = column_fallback + "_label"
+            label_column = merged_variable_name + "_label"
+
+            if label_preferred in variable_names and label_fallback in variable_names:
+                merged_lf = merged_lf.with_columns(
+                    pl.when(use_fallback)
+                    .then(pl.col(label_fallback))
+                    .otherwise(pl.col(label_preferred))
+                    .alias(label_column),
+                )
+
+            merged_lf = merged_lf.drop(
+                column_fallback,
+                column_preferred,
+                label_fallback,
+                label_preferred,
+                strict=False,
+            )
+
+    return merged_lf
