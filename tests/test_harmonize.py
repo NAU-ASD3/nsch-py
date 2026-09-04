@@ -219,7 +219,8 @@ def test_applies_several_rules_in_one_call() -> None:
         "family_r": {"years": ["2023"], "new_name": "family"},
     }
     result = rename_vars(lf, renames, 2023).collect()
-    assert result.columns == ["k4q02_r", "family", "hhid"]
+    expected = pl.DataFrame({"k4q02_r": [1], "family": [2], "hhid": [3]})
+    assert_frame_equal(result, expected)
 
 
 def test_empty_renames_leaves_the_frame_unchanged() -> None:
@@ -260,24 +261,17 @@ def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
 
 
 # Tests for merge_vars
-def test_merges_preferred_colums() -> None:
-    lf = pl.LazyFrame(
-        {"gowhensick": [1, 2, 3, 4], "k4q02_r": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
-    )
+def test_merges_preferred_columns() -> None:
+    # Also tests polars infers correct data type when types do not match
+    lf = pl.LazyFrame({"a": [1.0, 2.5, 3.0, 4.0], "b": [None, None, 3, 4], "c": [5, 6, 7, 8]})
     merges: dict[str, MergeRule] = {
-        "gowhensick_merged": {
+        "ab_merged": {
             "years": ["2023"],
-            "column_preferred": "k4q02_r",
-            "column_fallback": "gowhensick",
+            "column_preferred": "a",
+            "column_fallback": "b",
         }
     }
-    # Create a pl.DataFrame called "expected" that contains what our result should look like
-    expected = pl.DataFrame(
-        {
-            "hhid": [5, 6, 7, 8],
-            "gowhensick_merged": [1, 2, 3, 4],
-        }
-    )
+    expected = pl.DataFrame({"c": [5, 6, 7, 8], "ab_merged": [1.0, 2.5, 3.0, 4.0]})
     result = merge_vars(lf, merges, 2023).collect()
     # Assert on full frame
     assert_frame_equal(expected, result)
@@ -342,11 +336,20 @@ def test_non_logical_skip_does_not_use_fallback_value() -> None:
     assert_frame_equal(result, expected)
 
 
-# Test no merge for a non-matching year -> when merge_vars input year does not match MergeRule years
+# Test no merge when merge_vars input year does not match MergeRule years
 def test_non_matching_year() -> None:
     lf = pl.LazyFrame({"col_a": [1, None], "col_b": [None, 2]})
     merges: dict[str, MergeRule] = {
         "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
     }
     result = merge_vars(lf, merges, 2017)
+    assert_frame_equal(result, lf)
+
+
+def test_no_merge_applied_when_only_one_column_present() -> None:
+    lf = pl.LazyFrame({"col_a": [1, None]})
+    merges: dict[str, MergeRule] = {
+        "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
+    }
+    result = merge_vars(lf, merges, 2016)
     assert_frame_equal(result, lf)

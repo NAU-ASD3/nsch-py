@@ -7,7 +7,7 @@ from typing import TypedDict
 
 import polars as pl
 
-from nsch import _types
+from nsch._types import TaggedNA
 
 __all__ = [
     "MergeRule",
@@ -331,27 +331,27 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     --------
     >>> import polars as pl
     >>> lf = pl.LazyFrame(
-    ...     {"gowhensick": [1, 2, 3, 4], "k4q02_r": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
+    ...     {"hoursleep": [1, 2, 3, 4], "hoursleep05": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
     ... )
     >>> merges: dict[str, MergeRule] = {
-    ...     "gowhensick_merged": {
+    ...     "sleep": {
     ...         "years": ["2023"],
-    ...         "column_preferred": "k4q02_r",
-    ...         "column_fallback": "gowhensick",
+    ...         "column_preferred": "hoursleep",
+    ...         "column_fallback": "hoursleep05",
     ...     }
     ... }
     >>> merge_vars(lf, merges, 2023).collect()
     shape: (4, 2)
-    ┌──────┬───────────────────┐
-    │ hhid ┆ gowhensick_merged │
-    │ ---  ┆ ---               │
-    │ i64  ┆ i64               │
-    ╞══════╪═══════════════════╡
-    │ 5    ┆ 1                 │
-    │ 6    ┆ 2                 │
-    │ 7    ┆ 3                 │
-    │ 8    ┆ 4                 │
-    └──────┴───────────────────┘
+    ┌──────┬───────┐
+    │ hhid ┆ sleep │
+    │ ---  ┆ ---   │
+    │ i64  ┆ i64   │
+    ╞══════╪═══════╡
+    │ 5    ┆ 1     │
+    │ 6    ┆ 2     │
+    │ 7    ┆ 3     │
+    │ 8    ┆ 4     │
+    └──────┴───────┘
     """
 
     merged_lf = lf
@@ -372,14 +372,15 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
             fallback_values = pl.col(column_fallback)
 
             use_fallback = (preferred_values.is_null()) | (
-                preferred_values == _types.TaggedNA.LOGICAL_SKIP
+                preferred_values == TaggedNA.LOGICAL_SKIP
             )
 
+            # No cast to column type or int, polars will infer the type (divergance from R)
+            # protects against mismatching types in columns to merge
             merged_lf = merged_lf.with_columns(
                 pl.when(use_fallback)
                 .then(fallback_values)
                 .otherwise(preferred_values)
-                .cast(schema[column_preferred])  # Might be fragile
                 .alias(merged_variable_name)
             )
 
@@ -392,7 +393,7 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
                     pl.when(use_fallback)
                     .then(pl.col(label_fallback))
                     .otherwise(pl.col(label_preferred))
-                    .alias(label_column)
+                    .alias(label_column),
                 )
 
             merged_lf = merged_lf.drop(
