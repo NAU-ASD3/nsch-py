@@ -262,7 +262,7 @@ def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
 
 # Tests for merge_vars
 def test_merges_preferred_columns() -> None:
-    # Also tests polars infers correct data type when types do not match
+    # Also tests that polars infers correct data type when types do not match
     lf = pl.LazyFrame({"a": [1.0, 2.5, 3.0, 4.0], "b": [None, None, 3, 4], "c": [5, 6, 7, 8]})
     merges: dict[str, MergeRule] = {
         "ab_merged": {
@@ -273,7 +273,6 @@ def test_merges_preferred_columns() -> None:
     }
     expected = pl.DataFrame({"c": [5, 6, 7, 8], "ab_merged": [1.0, 2.5, 3.0, 4.0]})
     result = merge_vars(lf, merges, 2023).collect()
-    # Assert on full frame
     assert_frame_equal(expected, result)
 
 
@@ -290,8 +289,7 @@ def test_merges_label_columns() -> None:
     assert_frame_equal(expected, result)
 
 
-# Test label column stays in sync when logical skip triggers the use of the fallback value
-# Test logical skip 998 in the preferred column uses the fallback value
+# Test label column stays in sync when logical skip (998) triggers the use of the fallback value
 def test_logical_skip_uses_fallback_in_preferred_and_label_columns() -> None:
     lf = pl.LazyFrame(
         {
@@ -324,7 +322,7 @@ def test_missing_source_columns_are_silently_skipped() -> None:
 
 
 def test_non_logical_skip_does_not_use_fallback_value() -> None:
-    # also makes sure columns not mentioned in mergeRule are not changed
+    # also makes sure columns not mentioned in mergeRule remain unchanged
     lf = pl.LazyFrame(
         {"col_a": [996, 997, 998, 999], "col_b": [2, 3, 4, 5], "col_c": [0.01, 0.02, 0.03, 0.04]}
     )
@@ -336,8 +334,7 @@ def test_non_logical_skip_does_not_use_fallback_value() -> None:
     assert_frame_equal(result, expected)
 
 
-# Test no merge when merge_vars input year does not match MergeRule years
-def test_non_matching_year() -> None:
+def test_no_merge_applied_foa_a_non_matching_year() -> None:
     lf = pl.LazyFrame({"col_a": [1, None], "col_b": [None, 2]})
     merges: dict[str, MergeRule] = {
         "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
