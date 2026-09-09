@@ -12,6 +12,14 @@ so each version stays unique and the date stays honest.
 
 - Update `.pre-commit-config.yaml` to use local project dependencies in mypy hooks rather than its own manually-scoped venv
 
+## 2026.8.24.1 (PR#68)
+
+- Added `apply_do_labels` for converting coded values to `pl.Enum` labels from the `DoSpec` produced by `parse_do`, resolving remaining sentinel codes to null.
+
+## 2026.8.24 (PR#61)
+
+- Added `parse_do` for reading NSCH Stata `.do` files and introduced the `DoSpec` type for parsed variable and value labels.
+
 ## 2026.8.13 (PR#59)
 
 - Added `read_nsch_dta` and  `readers.py` module for ingesting data and handling tagged NAs

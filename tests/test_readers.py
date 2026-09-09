@@ -1,4 +1,4 @@
-"""Tests for the readers module"""
+"""Tests for the readers module."""
 
 from __future__ import annotations
 
@@ -8,7 +8,148 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.readers import read_nsch_dta
+from nsch.readers import parse_do, read_nsch_dta
+
+
+def test_parse_do_raises_error_for_missing_file(tmp_path: Path) -> None:
+    """Raise an informative error when the Stata do-file does not exist."""
+    missing_file = tmp_path / "missing.do"
+
+    with pytest.raises(
+        FileNotFoundError,
+        match="year_do_path should be the path to a Stata do file",
+    ):
+        parse_do(missing_file)
+
+
+def test_parse_do_parses_variable_labels(tmp_path: Path) -> None:
+    """Parse ``label var`` statements from a Stata do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label var SC_SEX "Sex of selected child"\nlabel var SC_AGE "Age of selected child"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_AGE"],
+            "desc": [
+                "Sex of selected child",
+                "Age of selected child",
+            ],
+        }
+    )
+
+    assert_frame_equal(result.var.collect(), expected)
+
+
+def test_parse_do_parses_value_labels(tmp_path: Path) -> None:
+    """Parse ``label define`` statements from a Stata do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text('label define SC_SEX_lab 1 "Male"\nlabel define SC_SEX_lab 2 "Female"\n')
+
+    result = parse_do(do_file)
+
+    expected = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX"],
+            "value": ["1", "2"],
+            "desc": ["Male", "Female"],
+        }
+    )
+
+    assert_frame_equal(result.define.collect(), expected)
+
+
+def test_parse_do_preserves_dotted_missing_values(tmp_path: Path) -> None:
+    """Preserve dotted Stata missing values in label definitions."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+        'label define SC_SEX_lab .m "No valid response"\n'
+        'label define SC_SEX_lab .d "Suppressed"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX", "SC_SEX", "SC_SEX"],
+            "value": ["1", "2", ".m", ".d"],
+            "desc": [
+                "Male",
+                "Female",
+                "No valid response",
+                "Suppressed",
+            ],
+        }
+    )
+
+    assert_frame_equal(result.define.collect(), expected)
+
+
+def test_parse_do_ignores_non_label_lines(tmp_path: Path) -> None:
+    """Ignore non-label lines in a Stata do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        "/* 06062025 */\n"
+        "*************************************************************\n"
+        'local file = "<<INSERT FILE DIRECTORY>>"\n'
+        'use "nsch_2024e_topical", clear\n'
+        'label var a1_active "Adult 1 - Active Duty"\n'
+        'label define a1_active_lab 1 "Never served in the military"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected_var = pl.DataFrame(
+        {
+            "variable": ["a1_active"],
+            "desc": ["Adult 1 - Active Duty"],
+        }
+    )
+    expected_define = pl.DataFrame(
+        {
+            "variable": ["a1_active"],
+            "value": ["1"],
+            "desc": ["Never served in the military"],
+        }
+    )
+
+    assert_frame_equal(result.var.collect(), expected_var)
+    assert_frame_equal(result.define.collect(), expected_define)
+
+
+def test_parse_do_returns_variable_and_value_labels(tmp_path: Path) -> None:
+    """Return both variable and value-label metadata from one do-file."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label var SC_SEX "Sex of selected child"\n'
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+    )
+
+    result = parse_do(do_file)
+
+    expected_var = pl.DataFrame(
+        {
+            "variable": ["SC_SEX"],
+            "desc": ["Sex of selected child"],
+        }
+    )
+    expected_define = pl.DataFrame(
+        {
+            "variable": ["SC_SEX", "SC_SEX"],
+            "value": ["1", "2"],
+            "desc": ["Male", "Female"],
+        }
+    )
+
+    assert_frame_equal(result.var.collect(), expected_var)
+    assert_frame_equal(result.define.collect(), expected_define)
+
 
 dta_missing = Path("tests/data/tagged_missing.dta")
 dta_mixed = Path("tests/data/mixed_types.dta")
