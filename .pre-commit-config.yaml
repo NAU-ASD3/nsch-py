@@ -26,30 +26,41 @@ repos:
       - id: mixed-line-ending
         args: ["--fix=lf"]
 
+
   # --- Ruff: lint + format ----------------------------------------------
-  # The pre-commit hook is faster than `uv run ruff` because it uses ruff's
-  # cached binary. Two separate hooks so the diff between lint fixes and
-  # format changes stays visible in the commit.
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
+  # Ruff previously came from ruff-pre-commit, which pins its own binary
+  # independent of the dev dependency, risking version drift between what
+  # CI/devs run and what the hook enforces.
 
   # --- mypy: strict type checking ---------------------------------------
   # Runs the project's own mypy through uv, in the project's own venv, so
   # pre-commit and CI see the same tool version and the same installed
-  # packages as the project. The previously used pre-commit-mirrors-mypy
-  # hook it builds an isolated venv containing only what has been listed
-  # manuallt in additional_dependencies, so any import not
-  # in that list silently resolves to Any.
-  # Scoped to src/ directly in entry; tests use looser typing per pyproject.toml
+  # packages (numpy, polars, pydantic, ...). The pre-commit-mirrors-mypy
+  # hook used to run this previously buildt an isolated venv containing
+  # only what was manuall listed in additional_dependencies, so any import not
+  # in that list silently resolves to Any and breaks type aliases built from it.
+  # mypy is currently scoped to src/ directly in entry; tests use looser typing
+  # per pyproject.toml.
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        language: system
+        types: [python]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: true
+
       - id: mypy
         name: mypy
         entry: uv run mypy src/
         language: system
         types: [python]
         pass_filenames: false
+        require_serial: true
