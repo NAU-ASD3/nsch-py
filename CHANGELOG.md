@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.9.12 (PR#78)
+
+- Changed `TAGGED_NA_MAP` defined inside of `readers.py` to use the `STATA_TAG_TO_SENTINEL` mapping defined in `_types` when the combine module was created.
+- Updated readers and combine modules to both use tags without the leading dot. `parse_do`, however retains the leading dot.
+
 ## 2026.8.24.1 (PR#68)
 
 - Added `apply_do_labels` for converting coded values to `pl.Enum` labels from the `DoSpec` produced by `parse_do`, resolving remaining sentinel codes to null.
