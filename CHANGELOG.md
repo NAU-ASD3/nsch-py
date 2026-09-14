@@ -8,6 +8,12 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.9.14.1 (PR#66)
+
+- Added `get_nsch_index` for reading the NSCH index page and getting links to each dataset
+- Added `get_year` to download one year's NSCH Stata `.dta` and `.do` files
+- Added `get_all_years` to build a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
+
 ## 2026.9.14 (PR#73)
 
 - Added `merge_vars` for per-column merges based on the config.
