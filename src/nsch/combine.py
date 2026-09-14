@@ -95,7 +95,7 @@ def apply_do_labels(
     >>> define_lf = pl.LazyFrame(
     ...     {
     ...         "variable": ["sc_sex"] * 5,
-    ...         "value": ["1", "2", "m", "n", "d"],
+    ...         "value": ["1", "2", ".m", ".n", ".d"],
     ...         "desc": [
     ...             "Male",
     ...             "Female",
@@ -119,7 +119,7 @@ def apply_do_labels(
     └────────┘
     """
     sentinel_codes = [tag.value for tag in TaggedNA]
-    missing_values = STATA_TAG_TO_SENTINEL.keys()
+    missing_values = [f".{tag}" for tag in STATA_TAG_TO_SENTINEL]
 
     schema = lf.collect_schema()
     lf_vars = schema.names()

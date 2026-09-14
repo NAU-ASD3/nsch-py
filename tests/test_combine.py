@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import polars as pl
 from polars.testing import assert_frame_equal, assert_series_equal
 
 from nsch.combine import apply_do_labels
+from nsch.readers import parse_do
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
@@ -13,7 +19,7 @@ def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["sc_sex"] * 5,
-            "value": ["1", "2", "m", "n", "d"],
+            "value": ["1", "2", ".m", ".n", ".d"],
             "desc": [
                 "Male",
                 "Female",
@@ -38,7 +44,7 @@ def test_sentinel_codes_all_map_to_None() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["sc_sex"] * 6,
-            "value": ["1", "2", "m", "n", "l", "d"],
+            "value": ["1", "2", ".m", ".n", ".l", ".d"],
             "desc": [
                 "Male",
                 "Female",
@@ -61,7 +67,7 @@ def test_label_column_takes_priority_over_do_derived_labels() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["birthwt"] * 6,
-            "value": ["1", "2", "3", "m", "n", "d"],
+            "value": ["1", "2", "3", ".m", ".n", ".d"],
             "desc": [
                 "Very low birth weight",
                 "Low birth weight",
@@ -102,7 +108,7 @@ def test_variable_with_only_missing_codes_falls_through_to_plain_numeric() -> No
     define_lf = pl.LazyFrame(
         {
             "variable": ["all_missing"] * 4,
-            "value": ["m", "n", "l", "d"],
+            "value": [".m", ".n", ".l", ".d"],
             "desc": [
                 "No Response",
                 "Not In Universe",
@@ -121,7 +127,7 @@ def test_provided_alias_map_is_used() -> None:
     define_lf = pl.LazyFrame(
         {
             "variable": ["family_r"] * 4,
-            "value": ["1", "2", "3", "d"],
+            "value": ["1", "2", "3", ".d"],
             "desc": [
                 "Two biogical/adoptive parents, currently married",
                 "Two biogical/adoptive parents, not currently married",
@@ -179,7 +185,7 @@ def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
                 "family",
                 "family",
             ],
-            "value": ["1", "2", "3", "m", "4", "5", "6", "d"],
+            "value": ["1", "2", "3", ".m", "4", "5", "6", ".d"],
             "desc": [
                 "Very low birth weight",
                 "Low birth weight",
@@ -218,6 +224,33 @@ def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
                     "Two parents (at least one not biological/adoptive), currently married",
                 ]
             ),
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -> None:
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label var SC_SEX "Sex of Selected Child"\n'
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+        'label define SC_SEX_lab .m "No valid response"\n'
+        'label define SC_SEX_lab .d "Suppressed"\n'
+    )
+
+    do_lf = parse_do(do_file)
+    print(do_lf.define.collect())
+    print(do_lf.var.collect())
+
+    lf = pl.LazyFrame({"SC_SEX": [1, 1, 996, 999]})
+
+    result = apply_do_labels(lf, do_lf.define)
+
+    expected = pl.LazyFrame(
+        {"SC_SEX": ["Male", "Male", None, None]},
+        schema={
+            "SC_SEX": pl.Enum(["Male", "Female"]),
         },
     )
     assert_frame_equal(result, expected)
