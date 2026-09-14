@@ -334,7 +334,7 @@ def test_non_logical_skip_does_not_use_fallback_value() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_no_merge_applied_foa_a_non_matching_year() -> None:
+def test_no_merge_applied_for_a_non_matching_year() -> None:
     lf = pl.LazyFrame({"col_a": [1, None], "col_b": [None, 2]})
     merges: dict[str, MergeRule] = {
         "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}

@@ -8,7 +8,7 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.8.26 (PR#73)
+## 2026.9.14 (PR#73)
 
 - Added `merge_vars` for per-column merges based on the config.
 

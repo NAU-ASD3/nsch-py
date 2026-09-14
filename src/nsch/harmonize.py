@@ -375,7 +375,7 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
                 preferred_values == TaggedNA.LOGICAL_SKIP
             )
 
-            # No cast to column type or int, polars will infer the type (divergance from R)
+            # No cast to column type or int, polars will infer the type (divergence from R)
             # protects against mismatching types in columns to merge
             merged_lf = merged_lf.with_columns(
                 pl.when(use_fallback)
