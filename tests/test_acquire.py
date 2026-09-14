@@ -51,7 +51,6 @@ def test_get_nsch_index_reaches_out_to_network_when_no_path_given(respx_mock) ->
     )
 
     result = get_nsch_index()
-    print(result)
 
     # assert a request made to the specified route was actually made
     assert route.called
