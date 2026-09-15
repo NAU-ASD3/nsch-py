@@ -153,6 +153,17 @@ For example:
 }
 ```
 
+> **Why some transforms map 998.** By the time transforms run, a value of
+> 998 is never a real survey response (no NSCH code exceeds 400). It is the
+> logical-skip sentinel written at read time. A few variables deliberately
+> recode it into a substantive category because the survey's routing makes
+> the skip informative: a respondent was routed past this question because a
+> prior answer established there is no usual place, or past a visit-count
+> question because there were no visits to count. Only add a rule like this
+> when the `.do` file's routing confirms the skip logically implies the
+> answer, and never recode 996, 997, or 999, which represent genuine
+> missingness and must fall through to null at labeling.
+
 - `k4q02_r` is the harmonized variable whose values are being transformed.
 - `years` specifies the survey years in which this rule applies.
 - `value` contains the original response codes found in the raw data.
@@ -362,6 +373,10 @@ For example, `k11q43r` uses a different top-coded category in some years, and `h
 Instead of forcing harmonization through configuration, document the difference and treat it as an analysis or methodology decision.
 
 ### Sentinel value collisions
+
+Note that the 998 transforms shown earlier are not collisions. They are
+deliberate recodes of the logical-skip sentinel; see the callout in the
+`transform` section above.
 
 The project reserves tagged missing-value sentinels `996` through `999`. Most NSCH variables use much smaller response codes, but a few variables legitimately contain three-digit values. Whenever adding or modifying transformation rules, verify that genuine survey values are not accidentally treated as tagged missing values.
 
