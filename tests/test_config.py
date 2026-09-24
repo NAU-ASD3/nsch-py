@@ -42,7 +42,14 @@ def test_valid_config_passes_validation() -> None:
 
 
 def test_empty_desired_variables_raises_error() -> None:
-    Config_data = make_valid_config()
-    Config_data["desired_variables"] = []
+    config_data = make_valid_config()
+    config_data["desired_variables"] = []
     with pytest.raises(ValueError, match="desired_variables"):
-        Config.model_validate(Config_data)
+        Config.model_validate(config_data)
+
+
+def test_non_character_desired_variables_raises_error() -> None:
+    config_data = make_valid_config()
+    config_data["desired_variables"] = [1, 2, 3, 4, 5]
+    with pytest.raises(ValueError, match="desired_variables"):
+        Config.model_validate(config_data)
