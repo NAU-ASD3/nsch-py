@@ -1,5 +1,7 @@
 """Tests for Config module."""
 
+import pytest
+
 from nsch.config import Config
 
 
@@ -37,3 +39,10 @@ def test_valid_config_passes_validation() -> None:
     config = Config.model_validate(config_data)
 
     assert isinstance(config, Config)
+
+
+def test_empty_desired_variables_raises_error() -> None:
+    Config_data = make_valid_config()
+    Config_data["desired_variables"] = []
+    with pytest.raises(ValueError, match="desired_variables"):
+        Config.model_validate(Config_data)

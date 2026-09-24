@@ -1,6 +1,6 @@
 """Configuration models and loading functions for the NSCH pipeline"""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TransformRule(BaseModel):
@@ -38,5 +38,5 @@ class Transformations(BaseModel):
 class Config(BaseModel):
     """Configuration for NSCH pipeline"""
 
-    desired_variables: list[str]
+    desired_variables: list[str] = Field(min_length=1)
     transformations: Transformations
