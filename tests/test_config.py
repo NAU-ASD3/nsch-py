@@ -53,3 +53,15 @@ def test_non_character_desired_variables_raises_error() -> None:
     config_data["desired_variables"] = [1, 2, 3, 4, 5]
     with pytest.raises(ValueError, match="desired_variables"):
         Config.model_validate(config_data)
+
+
+def test_mismatched_transform_vector_lengths_raises_error() -> None:
+    config_data = make_valid_config()
+    config_data["transformations"]["transform"]["bad_var"] = {
+        "years": ["2016"],
+        "value": ["1", "2"],
+        "new_value": ["1"],
+        "new_label": ["A", "B"],
+    }
+    with pytest.raises(ValueError, match="length"):
+        Config.model_validate(config_data)
