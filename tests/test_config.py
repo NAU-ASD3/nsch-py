@@ -71,7 +71,18 @@ def test_missing_rename_columns_new_name_raises_error() -> None:
     config_data = make_valid_config()
     config_data["transformations"]["rename_columns"]["bad_rename"] = {
         "years": ["2016"],
-        ## new_name is missing
+        # new_name is missing
     }
     with pytest.raises(ValueError, match="new_name"):
+        Config.model_validate(config_data)
+
+
+def test_missing_merge_columns_fields_raise_error() -> None:
+    config_data = make_valid_config()
+    config_data["transformations"]["merge_columns"]["bad_merge"] = {
+        "years": ["2016"],
+        "column_preferred": "a",
+        # column_fallback is missing
+    }
+    with pytest.raises(ValueError, match="column_fallback"):
         Config.model_validate(config_data)
