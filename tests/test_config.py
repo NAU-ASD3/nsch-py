@@ -1,8 +1,10 @@
 """Tests for Config module."""
 
+from pathlib import Path
+
 import pytest
 
-from nsch.config import Config
+from nsch.config import Config, read_config
 
 
 def make_valid_config() -> dict[str, object]:
@@ -86,3 +88,16 @@ def test_missing_merge_columns_fields_raise_error() -> None:
     }
     with pytest.raises(ValueError, match="column_fallback"):
         Config.model_validate(config_data)
+
+
+def test_error_for_non_existent_file(tmp_path: Path) -> None:
+    does_not_exist = tmp_path / "does_not_exist.json"
+    with pytest.raises(ValueError, match="config_path should be the path to a JSON config file"):
+        read_config(does_not_exist)
+
+
+def tests_error_for_malformed_json(tmp_path: Path) -> None:
+    bad_json = tmp_path / "bad_json.json"
+    bad_json.write_text("{ not valid json !!!}")
+    with pytest.raises(ValueError, match="config_path should contain valid JSON"):
+        read_config(bad_json)

@@ -1,5 +1,7 @@
 """Configuration models and loading functions for the NSCH pipeline"""
 
+import json
+from pathlib import Path
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -15,7 +17,18 @@ class TransformRule(BaseModel):
 
     @model_validator(mode="after")
     def validate_paired_lengths(self) -> Self:
-        """Validate that paired transformation arrays have equal lenghts"""
+        """Validate that paired transformation arrays have equal lengths.
+
+        Returns
+        -------
+        Self
+            The validated transformation rule.
+
+        Raises
+        ------
+        ValueError
+            If value, new_value, and new_label have different lengths.
+        """
 
         lengths = {
             "value": len(self.value),
@@ -58,3 +71,36 @@ class Config(BaseModel):
 
     desired_variables: list[str] = Field(min_length=1)
     transformations: Transformations
+
+
+def read_config(path: Path | str) -> Config:
+    """Read and validate an NSCH JSON configuration file.
+
+    Parameters
+    ----------
+    path
+        Path to the JSON configuration file.
+
+    Returns
+    -------
+    Config
+        The validated NSCH configuration.
+
+    Raises
+    ------
+    ValueError
+        If the file does not exist or does not contain valid JSON.
+    """
+    config_path = Path(path)
+    if not config_path.exists():
+        raise ValueError(
+            "config_path should be the path to a JSON config file, "
+            f"but this file does not exist: {config_path}"
+        )
+
+    try:
+        json.loads(config_path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"config_path should contain valid JSON, but parsing failed: {e}") from e
+
+    raise NotImplementedError("Config validation is not implemented yet")
