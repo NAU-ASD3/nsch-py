@@ -8,10 +8,13 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from nsch.combine import apply_do_labels
 from nsch.harmonize import (
+    HarmonizeConfig,
     MergeRule,
     RenameRule,
     TransformValues,
+    harmonize_year,
     merge_vars,
     rename_vars,
     subset_vars,
@@ -350,3 +353,148 @@ def test_no_merge_applied_when_only_one_column_present() -> None:
     }
     result = merge_vars(lf, merges, 2016)
     assert_frame_equal(result, lf)
+
+
+# tests for harmonize_year
+
+
+def make_define_lf(entries: list[tuple[str, str, str]]) -> pl.LazyFrame:
+    """Build a define frame from (variable, value, desc) triples."""
+    return pl.LazyFrame(
+        {
+            "variable": [e[0] for e in entries],
+            "value": [e[1] for e in entries],
+            "desc": [e[2] for e in entries],
+        }
+    )
+
+
+def test_harmonize_year_matches_manual_pipeline() -> None:
+    """harmonize_year produces the same frame as calling each step by hand."""
+    lf = pl.LazyFrame({"year": [2099, 2099, 2099], "sc_sex": [1, 2, 1], "fam_count": [1, 2, 3]})
+    config: HarmonizeConfig = {
+        "desired_variables": ["sc_sex", "family"],
+        "transformations": {
+            "transform": {
+                "fam_count": {
+                    "years": ["2099"],
+                    "value": ["3"],
+                    "new_value": ["2"],
+                    "new_label": ["Two or more"],
+                }
+            },
+            "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+            "merge_columns": {},
+        },
+    }
+    define_lf = make_define_lf(
+        [
+            ("sc_sex", "1", "Male"),
+            ("sc_sex", "2", "Female"),
+            ("fam_count", "1", "One"),
+            ("fam_count", "2", "Two"),
+            ("fam_count", "3", "Three"),
+        ]
+    )
+
+    manual = transform_values(lf, config["transformations"]["transform"], 2099)
+    manual = rename_vars(manual, config["transformations"]["rename_columns"], 2099)
+    manual = merge_vars(manual, config["transformations"]["merge_columns"], 2099)
+    manual = subset_vars(manual, config["desired_variables"])
+    manual = apply_do_labels(manual, define_lf, {"family": "fam_count"})
+
+    result = harmonize_year(lf, config, 2099, define_lf)
+
+    assert_frame_equal(result.collect(), manual.collect())
+
+
+def test_harmonize_year_with_empty_rules_still_labels() -> None:
+    """With no rules, the year is subset and labeled straight from the define frame."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "sc_sex": [1, 2]})
+    config: HarmonizeConfig = {
+        "desired_variables": ["sc_sex"],
+        "transformations": {"transform": {}, "rename_columns": {}, "merge_columns": {}},
+    }
+    define_lf = make_define_lf([("sc_sex", "1", "Male"), ("sc_sex", "2", "Female")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sc_sex": ["Male", "Female"]}, schema={"sc_sex": pl.Enum(["Male", "Female"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_renamed_column_is_labeled_from_pre_rename_define_entries() -> None:
+    """A renamed column is labeled via the alias map, not its new (unknown) name."""
+    lf = pl.LazyFrame({"year": [2099] * 4, "fam_count": [1, 2, 3, 1]})
+    config: HarmonizeConfig = {
+        "desired_variables": ["family"],
+        "transformations": {
+            "transform": {},
+            "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+            "merge_columns": {},
+        },
+    }
+    define_lf = make_define_lf(
+        [("fam_count", "1", "One"), ("fam_count", "2", "Two"), ("fam_count", "3", "Three")]
+    )
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"family": ["One", "Two", "Three", "One"]},
+        schema={"family": pl.Enum(["One", "Two", "Three"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_merge_output_is_labeled_from_preferred_source_define_entries() -> None:
+    """A merge output is labeled via the alias map from its column_preferred source."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "hoursleep": [1, None], "hoursleep05": [None, 2]})
+    config: HarmonizeConfig = {
+        "desired_variables": ["sleep"],
+        "transformations": {
+            "transform": {},
+            "rename_columns": {},
+            "merge_columns": {
+                "sleep": {
+                    "years": ["2099"],
+                    "column_preferred": "hoursleep",
+                    "column_fallback": "hoursleep05",
+                }
+            },
+        },
+    }
+    define_lf = make_define_lf(
+        [("hoursleep", "1", "Less than 6 hours"), ("hoursleep", "2", "6 hours")]
+    )
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sleep": ["Less than 6 hours", "6 hours"]},
+        schema={"sleep": pl.Enum(["Less than 6 hours", "6 hours"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_rules_for_another_year_are_skipped() -> None:
+    """Rules scoped to other years do nothing, and the alias map stays empty."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "fam_count": [1, 2]})
+    config: HarmonizeConfig = {
+        "desired_variables": ["fam_count"],
+        "transformations": {
+            "transform": {},
+            "rename_columns": {"fam_count": {"years": ["2016"], "new_name": "family"}},
+            "merge_columns": {},
+        },
+    }
+    define_lf = make_define_lf([("fam_count", "1", "One"), ("fam_count", "2", "Two")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"fam_count": ["One", "Two"]}, schema={"fam_count": pl.Enum(["One", "Two"])}
+    )
+    assert_frame_equal(result, expected)
