@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.4 (PR#78)
+
+- Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
+- `apply_do_labels` now adds the leading dot at the point of use to match `parse_do`'s dotted output; a seam test runs a real `.do` file through both to keep the two in agreement
+
 ## 2026.9.14.2 (PR#77)
 
 - Updated `.pre-commit-config.yaml` to run mypy, ruff, and ruff-format as local hooks through uv, so the hooks, the gate, and CI share one tool version in one environment
