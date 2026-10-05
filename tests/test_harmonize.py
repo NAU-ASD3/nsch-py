@@ -403,9 +403,23 @@ def test_harmonize_year_matches_manual_pipeline() -> None:
     manual = subset_vars(manual, config["desired_variables"])
     manual = apply_do_labels(manual, define_lf, {"family": "fam_count"})
 
-    result = harmonize_year(lf, config, 2099, define_lf)
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
 
-    assert_frame_equal(result.collect(), manual.collect())
+    assert_frame_equal(result, manual.collect())
+    # The transform's override label must survive subset_vars (which keeps
+    # _label companions) and win its row at labeling, with the new label
+    # appended to the Enum after the .do-defined ones.
+    expected = pl.DataFrame(
+        {
+            "sc_sex": ["Male", "Female", "Male"],
+            "family": ["One", "Two", "Two or more"],
+        },
+        schema={
+            "sc_sex": pl.Enum(["Male", "Female"]),
+            "family": pl.Enum(["One", "Two", "Three", "Two or more"]),
+        },
+    )
+    assert_frame_equal(result, expected)
 
 
 def test_harmonize_year_with_empty_rules_still_labels() -> None:
