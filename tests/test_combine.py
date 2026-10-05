@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import polars as pl
 from polars.testing import assert_frame_equal, assert_series_equal
 
 from nsch.combine import apply_do_labels
+from nsch.readers import parse_do
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_numeric_column_is_converted_to_enum_with_correct_levels() -> None:
@@ -218,6 +224,32 @@ def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
                     "Two parents (at least one not biological/adoptive), currently married",
                 ]
             ),
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -> None:
+    """Dotted missing values from a real .do file are nulled by apply_do_labels."""
+    do_file = tmp_path / "example.do"
+    do_file.write_text(
+        'label var SC_SEX "Sex of Selected Child"\n'
+        'label define SC_SEX_lab 1 "Male"\n'
+        'label define SC_SEX_lab 2 "Female"\n'
+        'label define SC_SEX_lab .m "No valid response"\n'
+        'label define SC_SEX_lab .d "Suppressed"\n'
+    )
+
+    do_lf = parse_do(do_file)
+
+    lf = pl.LazyFrame({"SC_SEX": [1, 1, 996, 999]})
+
+    result = apply_do_labels(lf, do_lf.define)
+
+    expected = pl.LazyFrame(
+        {"SC_SEX": ["Male", "Male", None, None]},
+        schema={
+            "SC_SEX": pl.Enum(["Male", "Female"]),
         },
     )
     assert_frame_equal(result, expected)
