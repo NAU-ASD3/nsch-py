@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import warnings
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import polars as pl
 
 from nsch._types import TaggedNA
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "MergeRule",
@@ -405,3 +408,47 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
             )
 
     return merged_lf
+
+
+def impute_a1_grade_2016(combined_lf: pl.DataFrame, dta_2016_path: Path, seed: int) -> pl.DataFrame:
+    """Redistributes coarse 2016 grade imputation across finer categories used
+    in 2017 and later.
+    In 2016, Census imputed ``a1_grade`` (Adult 1's highest education level)
+    into 3 coarse categories stored in ``a1_grade_i``, rather than the 9
+    fine-grained categories used in 2017 and later.
+
+    This function cannot use the standard per-year config-driven transform pipeline
+    because it requires cross-year proportion computation and probabilistic
+    redistribution - operations that the per-year transform/rename/merge system
+    does not support.
+
+    For each 2016 row where the imputation flag is set, the function reads the
+    coarse group from the raw 2016 ``.dta`` file, then uses weights derived from
+    the non-2016 ``a1_grade`` distribution to assign a fine category. Reproducible
+    given the same ``seed``.
+
+    After assigning fine ``a1_grade`` values, the function deterministically
+    updates ``higrade`` (3-level) and ``higrade_tvis`` (4-level) to be consistent,
+    using the same mappings that ``apply_do_labels`` derives from the ``.do`` files.
+
+    Parameters
+    ----------
+    combined_lf : pl.DataFrame
+        A pl.DataFrame of combined multi-year survey data, as returned by
+        ``combine_years``. Must contain columns ``year``, ``hhid``, ``a1_grade``,
+        ``higrade``, and ``higrade_tvis` (all factors).
+
+    dta_2016_path : Path
+        The path to the raw 2016 Stata ``.dta`` file. Must contain columns
+        ``hhid``, ``a1_grade_if`` (imputation flag), and ``a1_grade_i`` (coarse
+        imputed category: 1 = less than high school, 2 = high school graduate,
+        3 = more than high school.)
+
+    seed : int
+        Integer seed used to set seed value before sampling to impute. Default ``1``.
+
+    Returns:
+    --------
+        A pl.DataFrame of all years combined and values imputed.
+    """
+    raise NotImplementedError

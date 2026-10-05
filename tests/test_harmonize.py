@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
 
+import numpy as np
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
@@ -17,6 +19,9 @@ from nsch.harmonize import (
     subset_vars,
     transform_values,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -350,3 +355,113 @@ def test_no_merge_applied_when_only_one_column_present() -> None:
     }
     result = merge_vars(lf, merges, 2016)
     assert_frame_equal(result, lf)
+
+
+# Tests for impute_a1_grade_2016
+# Function to create Synthetic .dta in data/make_fixtures.py
+
+PATH_2016_DTA: Path = "tests/data/2016_impute_test.dta"
+
+
+# Helper: build a minimal combined.dt with 2016 (NA a1_grade) and non-2016 rows (populated a1_grade)
+def make_combined_test_dataframe(
+    n_rows_2016: int = 10, n_rows_other_years: int = 40, seed: int = 1
+) -> pl.DataFrame:
+    a1_levels = [
+        "8th grade or less",
+        "9th-12th grade; No diploma",
+        "High School Graduate or GED Completed",
+        "Completed a vocational, trade, or business school program",
+        "Some College Credit, but No Degree",
+        "Associate Degree (AA, AS)",
+        "Bachelor's Degree (BA, BS, AB)",
+        "Master's Degree (MA, MS, MSW, MBA)",
+        "Doctorate (PhD, EdD) or Professional Degree (MD, DDS, DVM, JD)",
+    ]
+    higrade_levels = [
+        "Less than high school",
+        "High school (including vocational, trade, or business school)",
+        "More than high school",
+    ]
+    higrade_tvis_levels = [
+        "Less than high school",
+        "High school (including vocational, trade, or business school)",
+        "Some college or Associate Degree",
+        "College degree or higher",
+    ]
+
+    higrade_map = dict(
+        zip(
+            a1_levels,
+            [
+                higrade_levels[0],
+                higrade_levels[0],
+                higrade_levels[1],
+                higrade_levels[1],
+                higrade_levels[2],
+                higrade_levels[2],
+                higrade_levels[2],
+                higrade_levels[2],
+                higrade_levels[2],
+            ],
+            strict=False,
+        )
+    )
+
+    tvis_map = dict(
+        zip(
+            a1_levels,
+            [
+                higrade_tvis_levels[0],
+                higrade_tvis_levels[0],
+                higrade_tvis_levels[1],
+                higrade_tvis_levels[1],
+                higrade_tvis_levels[2],
+                higrade_tvis_levels[2],
+                higrade_tvis_levels[3],
+                higrade_tvis_levels[3],
+                higrade_tvis_levels[3],
+            ],
+            strict=False,
+        )
+    )
+
+    a1_enum, higrade_enum, tvis_enum = (
+        pl.Enum(a1_levels),
+        pl.Enum(higrade_levels),
+        pl.Enum(higrade_tvis_levels),
+    )
+
+    rng = np.random.default_rng(seed)
+    other_grades = rng.choice(a1_levels, size=n_rows_other_years, replace=True).tolist()
+    other_higrade = [higrade_map[g] for g in other_grades]
+    other_tvis = [tvis_map[g] for g in other_grades]
+
+    dt_other = pl.DataFrame(
+        {
+            "year": pl.Series([2017] * n_rows_other_years, dtype=pl.Int32),
+            "hhid": pl.Series(range(1, n_rows_other_years + 1), dtype=pl.Int32) + 1000,
+            "a1_grade": pl.Series(other_grades, dtype=a1_enum),
+            "higrade": pl.Series(other_higrade, dtype=higrade_enum),
+            "higrade_tvis": pl.Series(other_tvis, dtype=tvis_enum),
+        }
+    )
+
+    dt_2016 = pl.DataFrame(
+        {
+            "year": pl.Series([2016] * n_rows_2016, dtype=pl.Int32),
+            "hhid": pl.Series(range(1, n_rows_2016 + 1), dtype=pl.Int32),
+            "a1_grade": pl.Series([None] * n_rows_2016, dtype=a1_enum),
+            "higrade": pl.Series([None] * n_rows_2016, dtype=higrade_enum),
+            "higrade_tvis": pl.Series([None] * n_rows_2016, dtype=tvis_enum),
+        }
+    )
+
+    return pl.concat([dt_2016, dt_other])
+
+
+# test imputation is reproducable when the same seed is used
+# test imputation is different when a different seed is used
+# test only 2016 rows are modified
+# test 2016 rows with non-impute flags are not modified
+# test no NAs are left in a1_grade after imputation

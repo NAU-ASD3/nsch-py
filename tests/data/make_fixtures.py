@@ -1,4 +1,4 @@
-"""Generates a set of tiny synthetic .dta files for testing readers.py.
+"""Generates a set of tiny synthetic .dta files for testing readers.py and harmonize.py.
 This script is the source of truth for .dta files used in testing.
 """
 
@@ -79,6 +79,25 @@ def create_no_stratum_data() -> None:
     )
 
 
+# create a synthetic 2016 .dta with hhid, a1_grade_if, a1_grade_i to test impute_a1_grade_2016()
+def create_2016_dta(n: int = 10) -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016] * n,
+            "hhid": list(range(1, n + 1)),
+            "a1_grade_if": [True] * n,
+            "a1_grade_i": np.random.choice([1, 2, 3], size=n, replace=True),
+        },
+        strict=False,
+    )
+
+    pyreadstat.write_dta(
+        df,
+        "tests/data/2016_impute_test.dta",
+    )
+
+
 create_tagged_missing_dta()
 create_mixed_types_dta()
 create_no_stratum_data()
+create_2016_dta()
