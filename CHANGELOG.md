@@ -8,10 +8,24 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.9.12 (PR#78)
+## 2026.10.4 (PR#78)
 
-- Changed `TAGGED_NA_MAP` defined inside of `readers.py` to use the `STATA_TAG_TO_SENTINEL` mapping defined in `_types` when the combine module was created.
-- Updated readers and combine modules to both use tags without the leading dot. `parse_do`, however retains the leading dot.
+- Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
+- `apply_do_labels` now adds the leading dot at the point of use to match `parse_do`'s dotted output; a seam test runs a real `.do` file through both to keep the two in agreement
+
+## 2026.9.14.2 (PR#77)
+
+- Updated `.pre-commit-config.yaml` to run mypy, ruff, and ruff-format as local hooks through uv, so the hooks, the gate, and CI share one tool version in one environment
+
+## 2026.9.14.1 (PR#66)
+
+- Added `get_nsch_index` for reading the NSCH index page and getting links to each dataset
+- Added `get_year` to download one year's NSCH Stata `.dta` and `.do` files
+- Added `get_all_years` to build a `pl.DataFrame` of all `.dta` and `.do` files found in a directory
+
+## 2026.9.14 (PR#73)
+
+- Added `merge_vars` for per-column merges based on the config.
 
 ## 2026.8.24.1 (PR#68)
 

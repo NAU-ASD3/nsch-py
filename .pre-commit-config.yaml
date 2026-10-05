@@ -26,25 +26,40 @@ repos:
       - id: mixed-line-ending
         args: ["--fix=lf"]
 
-  # --- Ruff: lint + format ----------------------------------------------
-  # The pre-commit hook is faster than `uv run ruff` because it uses ruff's
-  # cached binary. Two separate hooks so the diff between lint fixes and
-  # format changes stays visible in the commit.
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+
+  # --- Local hooks: ruff, ruff-format, mypy ------------------------------
+  # All three run the project's own tools through uv, for two different
+  # reasons documented in issue #53:
+  #
+  # Ruff: the ruff-pre-commit mirror pins its own binary independent of the
+  # dev dependency, and nothing bumps that pin, risking version drift between
+  # what CI and developers run and what the hook enforces.
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
+        name: ruff
+        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        language: system
+        types: [python]
+        require_serial: true
 
-  # --- mypy: strict type checking ---------------------------------------
-  # Runs mypy on the source package. Tests are excluded from pre-commit
-  # mypy because they intentionally use looser typing (see pyproject.toml).
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
-    hooks:
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: true
+
+      # mypy: the mirrors-mypy hook built an isolated venv containing only
+      # what was manually listed in additional_dependencies, so any import
+      # not in that list silently resolved to Any and broke type aliases
+      # built from it. Running the project's own mypy in the project venv
+      # means the hook sees the same packages CI and the gate see. Scoped
+      # to src/ in the entry; tests use looser typing per pyproject.toml.
       - id: mypy
-        files: ^src/
-        additional_dependencies:
-          - polars>=1.24
-          - pydantic>=2.6
+        name: mypy
+        entry: uv run mypy src/
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true

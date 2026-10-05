@@ -230,6 +230,7 @@ def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
 
 
 def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -> None:
+    """Dotted missing values from a real .do file are nulled by apply_do_labels."""
     do_file = tmp_path / "example.do"
     do_file.write_text(
         'label var SC_SEX "Sex of Selected Child"\n'
@@ -240,8 +241,6 @@ def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -
     )
 
     do_lf = parse_do(do_file)
-    print(do_lf.define.collect())
-    print(do_lf.var.collect())
 
     lf = pl.LazyFrame({"SC_SEX": [1, 1, 996, 999]})
 
