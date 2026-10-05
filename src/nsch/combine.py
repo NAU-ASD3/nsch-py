@@ -225,3 +225,24 @@ def apply_do_labels(
         lf = lf.drop(label_cols_to_drop)
 
     return lf
+
+
+def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
+    """Combine harmonized yearly data tables
+    Concatenates a list of per-year ``pl.LazyFrame``s into a single combined dataset.
+    Handles columns that may exist in some years but not others using ---. Columns
+    without data for that year are filled with ``None``. Verifies that all tables have
+    a ``year`` column and that year values do not collide across tables.
+
+    Parameters
+    ----------
+    year_list: list[pl.LazyFrame]
+        A list of ``pl.LazyFrame``s, each containing a ``year`` column output from
+        each year's call to ``harmonize_year``.
+
+    Returns
+    -------
+        A single collected ``pl.DataFrame`` with all rows from years in the list combined.
+        Columns present in some years but not others are filled with ``None``.
+    """
+    raise NotImplementedError

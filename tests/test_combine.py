@@ -253,3 +253,6 @@ def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -
         },
     )
     assert_frame_equal(result, expected)
+
+
+# Testing Functions for combine_years
