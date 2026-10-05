@@ -8,11 +8,15 @@ from typing import TypedDict
 import polars as pl
 
 from nsch._types import TaggedNA
+from nsch.combine import apply_do_labels
 
 __all__ = [
+    "HarmonizeConfig",
     "MergeRule",
     "RenameRule",
     "TransformValues",
+    "Transformations",
+    "harmonize_year",
     "merge_vars",
     "rename_vars",
     "subset_vars",
@@ -405,3 +409,114 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
             )
 
     return merged_lf
+
+
+class Transformations(TypedDict):
+    """The three rule sections of ``variable-config.json``."""
+
+    transform: dict[str, TransformValues]
+    rename_columns: dict[str, RenameRule]
+    merge_columns: dict[str, MergeRule]
+
+
+class HarmonizeConfig(TypedDict):
+    """The parsed configuration ``harmonize_year`` consumes.
+
+    This is the plain-dict shape of ``variable-config.json``. A validated
+    Pydantic ``Config`` from the config layer produces exactly this shape via
+    ``model_dump()``, so the two layers connect without conversion code.
+    """
+
+    desired_variables: list[str]
+    transformations: Transformations
+
+
+def _build_alias_map(
+    renames: dict[str, RenameRule], merges: dict[str, MergeRule], year: int
+) -> dict[str, str]:
+    """Map post-rename and merge-output column names back to their .do names.
+
+    ``apply_do_labels`` looks up labels by column name, but by the time it
+    runs, renamed columns carry names the .do file never defined, and merge
+    outputs are brand new. This map tells it where to look instead: a
+    renamed column is labeled from its pre-rename define entries, and a
+    merge output from its ``column_preferred`` source. Mirrors R's
+    ``build_alias_map``.
+    """
+    alias: dict[str, str] = {}
+    year_str = str(year)
+    for old_name, rename in renames.items():
+        if year_str in rename["years"]:
+            alias[rename["new_name"]] = old_name
+    for out_name, merge in merges.items():
+        if year_str in merge["years"]:
+            alias[out_name] = merge["column_preferred"]
+    return alias
+
+
+def harmonize_year(
+    lf: pl.LazyFrame, config: HarmonizeConfig, year: int, define_lf: pl.LazyFrame
+) -> pl.LazyFrame:
+    """Run one survey year through the full harmonization sequence.
+
+    Applies, in order: ``transform_values``, ``rename_vars``,
+    ``merge_vars``, ``subset_vars``, then ``apply_do_labels`` with an alias
+    map so renamed and merged columns are labeled from the .do entries of
+    their original source variables. Mirrors R's ``harmonize_year``.
+
+    Parameters
+    ----------
+    lf
+        One year's data as read by ``read_nsch_dta``.
+    config
+        The parsed configuration (``HarmonizeConfig``). A Pydantic
+        ``Config`` can be passed as ``config.model_dump()``.
+    year
+        The survey year of ``lf``; selects which rules apply.
+    define_lf
+        The ``define`` frame of that year's ``DoSpec`` from ``parse_do``.
+
+    Returns
+    -------
+    pl.LazyFrame
+        The harmonized, labeled year, restricted to ``desired_variables``.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> lf = pl.LazyFrame({"year": [2099, 2099], "fam_count": [1, 3]})
+    >>> config: HarmonizeConfig = {
+    ...     "desired_variables": ["family"],
+    ...     "transformations": {
+    ...         "transform": {},
+    ...         "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+    ...         "merge_columns": {},
+    ...     },
+    ... }
+    >>> define_lf = pl.LazyFrame(
+    ...     {
+    ...         "variable": ["fam_count"] * 3,
+    ...         "value": ["1", "2", "3"],
+    ...         "desc": ["One", "Two", "Three"],
+    ...     }
+    ... )
+    >>> harmonize_year(lf, config, 2099, define_lf).collect()
+    shape: (2, 1)
+    ┌────────┐
+    │ family │
+    │ ---    │
+    │ enum   │
+    ╞════════╡
+    │ One    │
+    │ Three  │
+    └────────┘
+    """
+    transformations = config["transformations"]
+    lf = transform_values(lf, transformations["transform"], year)
+    lf = rename_vars(lf, transformations["rename_columns"], year)
+    lf = merge_vars(lf, transformations["merge_columns"], year)
+    lf = subset_vars(lf, config["desired_variables"])
+    alias = _build_alias_map(
+        transformations["rename_columns"], transformations["merge_columns"], year
+    )
+    return apply_do_labels(lf, define_lf, alias)
