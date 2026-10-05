@@ -442,6 +442,12 @@ def _build_alias_map(
     renamed column is labeled from its pre-rename define entries, and a
     merge output from its ``column_preferred`` source. Mirrors R's
     ``build_alias_map``.
+
+    Entries for columns that do not end up in the frame (for example a
+    merge whose source columns were absent that year) are harmless, because
+    ``apply_do_labels`` only consults the alias for columns it actually
+    sees. If a rename and a merge produce the same output name, the merge
+    entry wins, matching R's assignment order.
     """
     alias: dict[str, str] = {}
     year_str = str(year)
