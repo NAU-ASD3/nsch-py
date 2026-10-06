@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import polars as pl
 import pytest
-from polars.testing import assert_frame_equal
+from polars.testing import assert_frame_equal, assert_frame_not_equal
 
 from nsch.harmonize import (
     MergeRule,
     RenameRule,
     TransformValues,
+    impute_a1_grade_2016,
     merge_vars,
     rename_vars,
     subset_vars,
@@ -367,6 +368,25 @@ PATH_2016_DTA: Path = "tests/data/2016_impute_test.dta"
 def make_combined_test_dataframe(
     n_rows_2016: int = 10, n_rows_other_years: int = 40, seed: int = 1
 ) -> pl.DataFrame:
+    """Helper function for testing impute_a1_grades. Builds a minimal combined_df with rows for
+    2016 containing ``None`` for a1_grade, and rows for other years containing populated
+    a1_grade values.
+
+    Parameters
+    ----------
+    n_rows_2016 : int
+        Number of rows with the year 2016 to be included.
+    n_rows_other_years : int
+        Number of rows with years other than 2016 to be included.
+    seed : int
+        Seed for random funcitons. Default 1.
+
+    Returns
+    -------
+    A ``pl.DataFrame`` containing missing and populated a1_grade rows for 2016 and other years,
+    respectively.
+    """
+
     a1_levels = [
         "8th grade or less",
         "9th-12th grade; No diploma",
@@ -461,7 +481,31 @@ def make_combined_test_dataframe(
 
 
 # test imputation is reproducable when the same seed is used
+def test_a1_grade_imputation_is_reproducable_with_same_seed() -> None:
+    combine_df = make_combined_test_dataframe(10, 40)
+    # DataFrame is not modified in-place like the R version, so no need for 2 combine frames
+    imputed_df_1 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=42)
+    imputed_df_2 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=42)
+    assert_frame_equal(imputed_df_1, imputed_df_2)
+
+
 # test imputation is different when a different seed is used
+def test_a1_grade_imputation_is_different_with_different_seed() -> None:
+    combine_df = make_combined_test_dataframe(10, 40)
+    # DataFrame is not modified in-place like the R version, so no need for 2 combine frames
+    imputed_df_1 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=1)
+    imputed_df_2 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=2)
+    assert_frame_not_equal(imputed_df_1, imputed_df_2)
+
+
 # test only 2016 rows are modified
+def test_a1_grade_imputation_modifies_only_2016_rows() -> None:
+    combine_df = make_combined_test_dataframe(10, 40)
+    imputed_df = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=1)
+    assert imputed_df["a1_grade"].isna.sum() == 0
+    assert imputed_df["higrade"].isna.sum() == 0
+    assert imputed_df["higrade_tvis"].isna.sum() == 0
+
+
 # test 2016 rows with non-impute flags are not modified
 # test no NAs are left in a1_grade after imputation

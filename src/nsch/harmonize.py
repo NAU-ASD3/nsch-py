@@ -410,7 +410,7 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     return merged_lf
 
 
-def impute_a1_grade_2016(combined_lf: pl.DataFrame, dta_2016_path: Path, seed: int) -> pl.DataFrame:
+def impute_a1_grade_2016(combined_df: pl.DataFrame, dta_2016_path: Path, seed: int) -> pl.DataFrame:
     """Redistributes coarse 2016 grade imputation across finer categories used
     in 2017 and later.
     In 2016, Census imputed ``a1_grade`` (Adult 1's highest education level)
@@ -433,7 +433,7 @@ def impute_a1_grade_2016(combined_lf: pl.DataFrame, dta_2016_path: Path, seed: i
 
     Parameters
     ----------
-    combined_lf : pl.DataFrame
+    combined_df : pl.DataFrame
         A pl.DataFrame of combined multi-year survey data, as returned by
         ``combine_years``. Must contain columns ``year``, ``hhid``, ``a1_grade``,
         ``higrade``, and ``higrade_tvis` (all factors).
