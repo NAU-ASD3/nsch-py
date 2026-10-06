@@ -101,3 +101,9 @@ def tests_error_for_malformed_json(tmp_path: Path) -> None:
     bad_json.write_text("{ not valid json !!!}")
     with pytest.raises(ValueError, match="config_path should contain valid JSON"):
         read_config(bad_json)
+
+
+def test_bundled_config_passes_validation() -> None:
+    config = read_config()
+
+    assert isinstance(config, Config)

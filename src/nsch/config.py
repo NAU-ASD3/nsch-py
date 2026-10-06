@@ -1,5 +1,6 @@
 """Configuration models and loading functions for the NSCH pipeline"""
 
+import importlib.resources
 import json
 from pathlib import Path
 from typing import Self
@@ -73,13 +74,13 @@ class Config(BaseModel):
     transformations: Transformations
 
 
-def read_config(path: Path | str) -> Config:
+def read_config(path: Path | str | None = None) -> Config:
     """Read and validate an NSCH JSON configuration file.
 
     Parameters
     ----------
     path
-        Path to the JSON configuration file.
+        Path to the JSON configuration file. If None, the bundled configuration file is used.
 
     Returns
     -------
@@ -91,16 +92,19 @@ def read_config(path: Path | str) -> Config:
     ValueError
         If the file does not exist or does not contain valid JSON.
     """
-    config_path = Path(path)
-    if not config_path.exists():
-        raise ValueError(
-            "config_path should be the path to a JSON config file, "
-            f"but this file does not exist: {config_path}"
-        )
+    if path is None:
+        config_path = importlib.resources.files("nsch.data").joinpath("variable-config.json")
+    else:
+        config_path = Path(path)
+        if not config_path.exists():
+            raise ValueError(
+                "config_path should be the path to a JSON config file, "
+                f"but this file does not exist: {config_path}"
+            )
 
     try:
-        json.loads(config_path.read_text())
+        config_data = json.loads(config_path.read_text())
     except json.JSONDecodeError as e:
         raise ValueError(f"config_path should contain valid JSON, but parsing failed: {e}") from e
 
-    raise NotImplementedError("Config validation is not implemented yet")
+    return Config.model_validate(config_data)
