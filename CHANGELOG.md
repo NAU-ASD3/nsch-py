@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.6 (PR#86)
+
+- Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
+
 ## 2026.9.14.2 (PR#77)
 
 - Updated `.pre-commit-config.yaml` to run mypy, ruff, and ruff-format as local hooks through uv, so the hooks, the gate, and CI share one tool version in one environment
