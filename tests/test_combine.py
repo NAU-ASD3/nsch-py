@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import polars as pl
+import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 
-from nsch.combine import apply_do_labels
+from nsch.combine import apply_do_labels, combine_years
 from nsch.readers import parse_do
 
 if TYPE_CHECKING:
@@ -253,3 +254,69 @@ def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -
         },
     )
     assert_frame_equal(result, expected)
+
+
+# Testing Functions for combine_years
+
+
+def test_combines_multiple_year_frames_in_order() -> None:
+    """Rows from each year stack in list order with every year present once."""
+    y16 = pl.LazyFrame({"year": [2016, 2016, 2016], "x": [1, 2, 3]})
+    y17 = pl.LazyFrame({"year": [2017, 2017, 2017], "x": [4, 5, 6]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame({"year": [2016] * 3 + [2017] * 3, "x": [1, 2, 3, 4, 5, 6]})
+    assert_frame_equal(result, expected)
+
+
+def test_columns_missing_from_some_years_are_filled_with_null() -> None:
+    """A column present in one year only is null for the other years."""
+    y16 = pl.LazyFrame({"year": [2016, 2016], "x": [1, 2], "var2": [10.0, 20.0]})
+    y17 = pl.LazyFrame({"year": [2017, 2017], "x": [3, 4]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "x": [1, 2, 3, 4], "var2": [10.0, 20.0, None, None]}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_enum_categories_are_unioned_across_years() -> None:
+    """Enum columns widen to the union of per-year categories, first appearance first."""
+    y16 = pl.LazyFrame({"year": [2016, 2016], "place": ["Clinic", "Office"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic", "Office"]))
+    )
+    y24 = pl.LazyFrame({"year": [2024, 2024], "place": ["Office", "Urgent Care"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic", "Office", "Urgent Care"]))
+    )
+
+    result = combine_years([y16, y24])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2024, 2024], "place": ["Clinic", "Office", "Office", "Urgent Care"]},
+        schema={"year": pl.Int64, "place": pl.Enum(["Clinic", "Office", "Urgent Care"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_error_for_duplicate_year_values_across_frames() -> None:
+    """The same year in two frames is an error naming the year."""
+    a = pl.LazyFrame({"year": [2016, 2016], "x": [1, 2]})
+    b = pl.LazyFrame({"year": [2016, 2016], "x": [3, 4]})
+
+    with pytest.raises(ValueError, match="duplicate year"):
+        combine_years([a, b])
+
+
+def test_error_for_missing_year_column() -> None:
+    """A frame without a year column is an error naming its position."""
+    with pytest.raises(ValueError, match=r"element 0 .* 'year'"):
+        combine_years([pl.LazyFrame({"x": [1, 2]})])
+
+
+def test_error_for_empty_list() -> None:
+    """An empty list is an error rather than an empty frame."""
+    with pytest.raises(ValueError, match="non-empty"):
+        combine_years([])

@@ -886,7 +886,7 @@ wheels = [
 
 [[package]]
 name = "nsch"
-version = "2026.10.7"
+version = "2026.10.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
