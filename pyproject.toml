@@ -41,6 +41,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nsch"]
+artifacts = [
+    "src/nsch/data/variable-config.json",
+]
+
+[tool.hatch.build.targets.sdist]
+artifacts = [
+    "src/nsch/data/variable-config.json",
+]
 
 # --- uv -------------------------------------------------------------------
 # Dev dependencies are declared as a uv dependency group (PEP 735) so they
