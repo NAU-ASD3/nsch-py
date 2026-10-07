@@ -96,10 +96,9 @@ def read_config(path: Path | str | None = None) -> Config:
     Raises
     ------
     FileNotFoundError
-                  If the specified configuration file does not exist.
-
+        If the specified configuration file does not exist.
     ValueError
-             If the configuration file does not contain valid JSON.
+        If the configuration file does not contain valid JSON.
     """
     if path is None:
         config_path = importlib.resources.files("nsch.data").joinpath("variable-config.json")
