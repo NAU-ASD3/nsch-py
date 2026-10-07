@@ -7,12 +7,18 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
+__all__ = ["Config", "read_config"]
+
 
 class TransformRule(BaseModel):
-    """Configuration for transforming a varianble."""
+    """Configuration for transforming a variable."""
 
-    years: list[str]
-    value: list[str]
+    years: list[str] = Field(
+        description="Survey years this rule applies to. A set, not paired with the arrays below"
+    )
+    value: list[str] = Field(
+        description="Original values, positionally paired with new_value and new_label"
+    )
     new_value: list[str]
     new_label: list[str]
 
@@ -62,9 +68,9 @@ class MergeRule(BaseModel):
 class Transformations(BaseModel):
     """Configuration for variable transformation"""
 
-    transform: dict[str, TransformRule]
-    rename_columns: dict[str, RenameRule]
-    merge_columns: dict[str, MergeRule]
+    transform: dict[str, TransformRule] = Field(default_factory=dict)
+    rename_columns: dict[str, RenameRule] = Field(default_factory=dict)
+    merge_columns: dict[str, MergeRule] = Field(default_factory=dict)
 
 
 class Config(BaseModel):
@@ -89,15 +95,18 @@ def read_config(path: Path | str | None = None) -> Config:
 
     Raises
     ------
+    FileNotFoundError
+                  If the specified configuration file does not exist.
+
     ValueError
-        If the file does not exist or does not contain valid JSON.
+             If the configuration file does not contain valid JSON.
     """
     if path is None:
         config_path = importlib.resources.files("nsch.data").joinpath("variable-config.json")
     else:
         config_path = Path(path)
         if not config_path.exists():
-            raise ValueError(
+            raise FileNotFoundError(
                 "config_path should be the path to a JSON config file, "
                 f"but this file does not exist: {config_path}"
             )
