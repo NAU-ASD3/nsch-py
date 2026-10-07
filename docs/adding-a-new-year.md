@@ -410,6 +410,7 @@ Before submitting your changes, confirm that you have completed the following:
 - [ ] Checked new three-digit codes against the `996`–`999` sentinel range.
 - [ ] Flagged any top-coding or binning incomparabilities to the analysis side rather than patching them in the configuration.
 - [ ] Updated `variable-config.json`, including appending the new year to every still-valid rule's `years` array.
+- [ ] Updated `variable-config.json` in both the R and Python repositories to keep the two copies in sync.
 - [ ] Ran the harmonization pipeline and the three validation checks (`check_year_coverage()`, `check_na_rates()`, and `check_label_consistency()`) on the combined output.
 - [ ] Spot-checked a sample of transformed, renamed, and merged values against the raw data.
 
