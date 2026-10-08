@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import polars as pl
+
+if TYPE_CHECKING:
+    from nsch._types import DoSpec
+    from nsch.config import Config
 
 __all__ = ["check_label_consistency", "check_na_rates", "check_year_coverage"]
 
@@ -257,5 +263,32 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
             "n_years_data": pl.Int64,
             "n_years_total": pl.Int64,
             "missing_years": pl.Utf8,
+        },
+    )
+
+
+def check_config_do(config: Config, do_spec: DoSpec, year: int) -> pl.DataFrame:
+    """Report mismatches between configuration and a year's DoSpec"""
+    do_variables = set(do_spec.var.collect()["variable"].to_list())
+    missing_variables = set(config.desired_variables) - do_variables
+    rows = [
+        {
+            "variable": variable,
+            "year": year,
+            "source": "desired_variables",
+            "issue": "missing_variable",
+            "value": None,
+        }
+        for variable in sorted(missing_variables)
+    ]
+
+    return pl.DataFrame(
+        rows,
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+            "value": pl.Utf8,
         },
     )
