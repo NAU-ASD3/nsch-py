@@ -7,7 +7,14 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
-__all__ = ["Config", "read_config"]
+__all__ = [
+    "Config",
+    "MergeRule",
+    "RenameRule",
+    "TransformRule",
+    "Transformations",
+    "read_config",
+]
 
 
 class TransformRule(BaseModel):

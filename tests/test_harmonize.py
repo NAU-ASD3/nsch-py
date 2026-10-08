@@ -3,26 +3,35 @@
 from __future__ import annotations
 
 import warnings
+from typing import TypeVar
 
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
+from pydantic import BaseModel
 
+from nsch.combine import apply_do_labels
+from nsch.config import Config, MergeRule, RenameRule, TransformRule
 from nsch.harmonize import (
-    MergeRule,
-    RenameRule,
-    TransformValues,
+    harmonize_year,
     merge_vars,
     rename_vars,
     subset_vars,
     transform_values,
 )
 
+T = TypeVar("T", bound=BaseModel)
+
+
+def rules(model: type[T], raw: dict[str, dict[str, object]]) -> dict[str, T]:
+    """Build a rule mapping from plain dict literals, the config file's own shape."""
+    return {name: model.model_validate(fields) for name, fields in raw.items()}
+
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
     lf = pl.LazyFrame({"k2q01_d": [1.0, 2.0, 3.0]})
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["1"], "new_label": ["Yes"]}
         )
     }
@@ -34,7 +43,7 @@ def test_value_is_remapped_for_matching_year_and_label_column_is_created():
 def test_no_changes_for_non_matching_years():
     lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {"years": ["2017"], "value": ["2"], "new_value": ["1"], "new_label": ["Yes"]}
         )
     }
@@ -46,7 +55,7 @@ def test_no_changes_for_non_matching_years():
 def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
     lf = pl.LazyFrame({"family": [1, 2, 3, 4], "hoursleep": [1, 2, 3, 4]})
     transforms = {
-        "family": TransformValues(
+        "family": TransformRule.model_validate(
             {
                 "years": ["2016"],
                 "value": ["1", "2", "3", "4"],
@@ -54,7 +63,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
                 "new_label": ["Two Parents", "Two Parents", "Other", "Other"],
             }
         ),
-        "hoursleep": TransformValues(
+        "hoursleep": TransformRule.model_validate(
             {
                 "years": ["2016", "2017"],
                 "value": ["1", "2", "3", "4"],
@@ -78,7 +87,7 @@ def test_multiple_values_and_multiple_columns_are_remapped_for_matching_year():
 def test_label_only_transforms_work():
     lf = pl.LazyFrame({"sex": [1, 2, 1]})
     transforms = {
-        "sex": TransformValues(
+        "sex": TransformRule.model_validate(
             {
                 "years": ["2017"],
                 "value": ["1", "2"],
@@ -95,7 +104,7 @@ def test_label_only_transforms_work():
 def test_missing_variable_in_lf_is_silently_skipped():
     lf = pl.LazyFrame({"x": [1, 2]})
     transforms = {
-        "not_here": TransformValues(
+        "not_here": TransformRule.model_validate(
             {"years": ["2017"], "value": ["1"], "new_value": ["2"], "new_label": ["Two"]}
         )
     }
@@ -109,7 +118,7 @@ def test_missing_variable_in_lf_is_silently_skipped():
 def test_existing_label_cols_are_updated_with_values_filled():
     lf = pl.LazyFrame({"k2q01_d": [2.0, 2.0, 3.0], "k2q01_d_label": ["No", None, None]})
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["2"], "new_label": ["Yes"]}
         )
     }
@@ -121,7 +130,7 @@ def test_existing_label_cols_are_updated_with_values_filled():
 def test_empty_input_returns_empty():
     lf = pl.LazyFrame()
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {"years": ["2016", "2017"], "value": ["2"], "new_value": ["2"], "new_label": ["Yes"]}
         )
     }
@@ -132,7 +141,7 @@ def test_empty_input_returns_empty():
 def test_matching_year_but_no_matching_values_creates_null_label_column():
     lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {"years": ["2017"], "value": ["4"], "new_value": ["5"], "new_label": ["Yes"]}
         )
     }
@@ -148,7 +157,7 @@ def test_raises_error_for_duplicate_values_in_lookup():
     # Protects against a bad Config
     lf = pl.LazyFrame({"k2q01_d": [1, 2, 3]})
     transforms = {
-        "k2q01_d": TransformValues(
+        "k2q01_d": TransformRule.model_validate(
             {
                 "years": ["2016", "2017"],
                 "value": ["2", "2"],
@@ -176,9 +185,7 @@ def test_warning_for_missing_desired_subset_variable():
 # tests for rename_vars
 def test_renames_a_column_for_a_matching_year() -> None:
     lf = pl.LazyFrame({"gowhensick": [1, 2, 3], "hhid": [10, 20, 30]})
-    renames: dict[str, RenameRule] = {
-        "gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}
-    }
+    renames = rules(RenameRule, {"gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}})
     result = rename_vars(lf, renames, 2023)
     # The function stays lazy: nothing is collected until the caller asks.
     assert isinstance(result, pl.LazyFrame)
@@ -189,9 +196,7 @@ def test_renames_a_column_for_a_matching_year() -> None:
 
 def test_leaves_columns_unchanged_for_a_nonmatching_year() -> None:
     lf = pl.LazyFrame({"gowhensick": [1, 2, 3]})
-    renames: dict[str, RenameRule] = {
-        "gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}
-    }
+    renames = rules(RenameRule, {"gowhensick": {"years": ["2023", "2024"], "new_name": "k4q02_r"}})
     # 2016 isn't in the rule's years, so the column keeps its source name.
     result = rename_vars(lf, renames, 2016).collect()
     assert result.columns == ["gowhensick"]
@@ -199,14 +204,14 @@ def test_leaves_columns_unchanged_for_a_nonmatching_year() -> None:
 
 def test_ignores_rules_for_columns_that_are_absent() -> None:
     lf = pl.LazyFrame({"hhid": [10, 20, 30]})
-    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    renames = rules(RenameRule, {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}})
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["hhid"]
 
 
 def test_renames_the_label_companion_too() -> None:
     lf = pl.LazyFrame({"gowhensick": [4, 8], "gowhensick_label": ["Clinic", "Other"]})
-    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    renames = rules(RenameRule, {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}})
     result = rename_vars(lf, renames, 2023).collect()
     assert result.columns == ["k4q02_r", "k4q02_r_label"]
     assert result["k4q02_r_label"].to_list() == ["Clinic", "Other"]
@@ -214,10 +219,13 @@ def test_renames_the_label_companion_too() -> None:
 
 def test_applies_several_rules_in_one_call() -> None:
     lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2], "hhid": [3]})
-    renames: dict[str, RenameRule] = {
-        "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
-        "family_r": {"years": ["2023"], "new_name": "family"},
-    }
+    renames = rules(
+        RenameRule,
+        {
+            "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
+            "family_r": {"years": ["2023"], "new_name": "family"},
+        },
+    )
     result = rename_vars(lf, renames, 2023).collect()
     expected = pl.DataFrame({"k4q02_r": [1], "family": [2], "hhid": [3]})
     assert_frame_equal(result, expected)
@@ -234,10 +242,13 @@ def test_renames_are_applied_simultaneously_not_chained() -> None:
     # ends up as k4q02_r. Here both rules read the original names, so each
     # column moves exactly one step.
     lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2]})
-    renames: dict[str, RenameRule] = {
-        "gowhensick": {"years": ["2023"], "new_name": "family_r"},
-        "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
-    }
+    renames = rules(
+        RenameRule,
+        {
+            "gowhensick": {"years": ["2023"], "new_name": "family_r"},
+            "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
+        },
+    )
     result = rename_vars(lf, renames, 2023).collect()
     expected = pl.DataFrame({"family_r": [1], "k4q02_r": [2]})
     assert_frame_equal(result, expected)
@@ -245,17 +256,20 @@ def test_renames_are_applied_simultaneously_not_chained() -> None:
 
 def test_raises_when_two_rules_target_the_same_name() -> None:
     lf = pl.LazyFrame({"gowhensick": [1], "family_r": [2]})
-    renames: dict[str, RenameRule] = {
-        "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
-        "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
-    }
+    renames = rules(
+        RenameRule,
+        {
+            "gowhensick": {"years": ["2023"], "new_name": "k4q02_r"},
+            "family_r": {"years": ["2023"], "new_name": "k4q02_r"},
+        },
+    )
     with pytest.raises(ValueError, match="more than one column"):
         rename_vars(lf, renames, 2023)
 
 
 def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
     lf = pl.LazyFrame({"gowhensick": [1], "k4q02_r": [2]})
-    renames: dict[str, RenameRule] = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    renames = rules(RenameRule, {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}})
     with pytest.raises(ValueError, match="existing columns"):
         rename_vars(lf, renames, 2023)
 
@@ -264,13 +278,16 @@ def test_raises_when_a_rename_target_collides_with_an_existing_column() -> None:
 def test_merges_preferred_columns() -> None:
     # Also tests that polars infers correct data type when types do not match
     lf = pl.LazyFrame({"a": [1.0, 2.5, 3.0, 4.0], "b": [None, None, 3, 4], "c": [5, 6, 7, 8]})
-    merges: dict[str, MergeRule] = {
-        "ab_merged": {
-            "years": ["2023"],
-            "column_preferred": "a",
-            "column_fallback": "b",
-        }
-    }
+    merges = rules(
+        MergeRule,
+        {
+            "ab_merged": {
+                "years": ["2023"],
+                "column_preferred": "a",
+                "column_fallback": "b",
+            }
+        },
+    )
     expected = pl.DataFrame({"c": [5, 6, 7, 8], "ab_merged": [1.0, 2.5, 3.0, 4.0]})
     result = merge_vars(lf, merges, 2023).collect()
     assert_frame_equal(expected, result)
@@ -280,9 +297,9 @@ def test_merges_label_columns() -> None:
     lf = pl.LazyFrame(
         {"a": [1, None], "b": [None, 2], "a_label": ["One", None], "b_label": [None, "Two"]}
     )
-    merges: dict[str, MergeRule] = {
-        "merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}
-    }
+    merges = rules(
+        MergeRule, {"merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}}
+    )
 
     expected = pl.DataFrame({"merged": [1, 2], "merged_label": ["One", "Two"]})
     result = merge_vars(lf, merges, 2016).collect()
@@ -299,9 +316,9 @@ def test_logical_skip_uses_fallback_in_preferred_and_label_columns() -> None:
             "b_label": [None, "Two", None],
         }
     )
-    merges: dict[str, MergeRule] = {
-        "merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}
-    }
+    merges = rules(
+        MergeRule, {"merged": {"years": ["2016"], "column_preferred": "a", "column_fallback": "b"}}
+    )
     result = merge_vars(lf, merges, 2016).collect()
     expected = pl.DataFrame({"merged": [1, 2, None], "merged_label": ["One", "Two", None]})
     assert_frame_equal(result, expected)
@@ -309,13 +326,16 @@ def test_logical_skip_uses_fallback_in_preferred_and_label_columns() -> None:
 
 def test_missing_source_columns_are_silently_skipped() -> None:
     lf = pl.LazyFrame({"x": [1, 2]})
-    merges: dict[str, MergeRule] = {
-        "merged": {
-            "years": ["2016"],
-            "column_preferred": "not_here",
-            "column_fallback": "also_not_here",
-        }
-    }
+    merges = rules(
+        MergeRule,
+        {
+            "merged": {
+                "years": ["2016"],
+                "column_preferred": "not_here",
+                "column_fallback": "also_not_here",
+            }
+        },
+    )
 
     result = merge_vars(lf, merges, 2016)
     assert_frame_equal(lf, result)
@@ -326,9 +346,10 @@ def test_non_logical_skip_does_not_use_fallback_value() -> None:
     lf = pl.LazyFrame(
         {"col_a": [996, 997, 998, 999], "col_b": [2, 3, 4, 5], "col_c": [0.01, 0.02, 0.03, 0.04]}
     )
-    merges: dict[str, MergeRule] = {
-        "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
-    }
+    merges = rules(
+        MergeRule,
+        {"merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}},
+    )
     result = merge_vars(lf, merges, 2016)
     expected = pl.LazyFrame({"col_c": [0.01, 0.02, 0.03, 0.04], "merged": [996, 997, 4, 999]})
     assert_frame_equal(result, expected)
@@ -336,17 +357,188 @@ def test_non_logical_skip_does_not_use_fallback_value() -> None:
 
 def test_no_merge_applied_for_a_non_matching_year() -> None:
     lf = pl.LazyFrame({"col_a": [1, None], "col_b": [None, 2]})
-    merges: dict[str, MergeRule] = {
-        "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
-    }
+    merges = rules(
+        MergeRule,
+        {"merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}},
+    )
     result = merge_vars(lf, merges, 2017)
     assert_frame_equal(result, lf)
 
 
 def test_no_merge_applied_when_only_one_column_present() -> None:
     lf = pl.LazyFrame({"col_a": [1, None]})
-    merges: dict[str, MergeRule] = {
-        "merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}
-    }
+    merges = rules(
+        MergeRule,
+        {"merged": {"years": ["2016"], "column_fallback": "col_b", "column_preferred": "col_a"}},
+    )
     result = merge_vars(lf, merges, 2016)
     assert_frame_equal(result, lf)
+
+
+# tests for harmonize_year
+
+
+def make_define_lf(entries: list[tuple[str, str, str]]) -> pl.LazyFrame:
+    """Build a define frame from (variable, value, desc) triples."""
+    return pl.LazyFrame(
+        {
+            "variable": [e[0] for e in entries],
+            "value": [e[1] for e in entries],
+            "desc": [e[2] for e in entries],
+        }
+    )
+
+
+def test_harmonize_year_matches_manual_pipeline() -> None:
+    """harmonize_year produces the same frame as calling each step by hand."""
+    lf = pl.LazyFrame({"year": [2099, 2099, 2099], "sc_sex": [1, 2, 1], "fam_count": [1, 2, 3]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["sc_sex", "family"],
+            "transformations": {
+                "transform": {
+                    "fam_count": {
+                        "years": ["2099"],
+                        "value": ["3"],
+                        "new_value": ["2"],
+                        "new_label": ["Two or more"],
+                    }
+                },
+                "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+                "merge_columns": {},
+            },
+        }
+    )
+    define_lf = make_define_lf(
+        [
+            ("sc_sex", "1", "Male"),
+            ("sc_sex", "2", "Female"),
+            ("fam_count", "1", "One"),
+            ("fam_count", "2", "Two"),
+            ("fam_count", "3", "Three"),
+        ]
+    )
+
+    manual = transform_values(lf, config.transformations.transform, 2099)
+    manual = rename_vars(manual, config.transformations.rename_columns, 2099)
+    manual = merge_vars(manual, config.transformations.merge_columns, 2099)
+    manual = subset_vars(manual, config.desired_variables)
+    manual = apply_do_labels(manual, define_lf, {"family": "fam_count"})
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    assert_frame_equal(result, manual.collect())
+    # The transform's override label must survive subset_vars (which keeps
+    # _label companions) and win its row at labeling, with the new label
+    # appended to the Enum after the .do-defined ones.
+    expected = pl.DataFrame(
+        {
+            "sc_sex": ["Male", "Female", "Male"],
+            "family": ["One", "Two", "Two or more"],
+        },
+        schema={
+            "sc_sex": pl.Enum(["Male", "Female"]),
+            "family": pl.Enum(["One", "Two", "Three", "Two or more"]),
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_harmonize_year_with_empty_rules_still_labels() -> None:
+    """With no rules, the year is subset and labeled straight from the define frame."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "sc_sex": [1, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["sc_sex"],
+            "transformations": {"transform": {}, "rename_columns": {}, "merge_columns": {}},
+        }
+    )
+    define_lf = make_define_lf([("sc_sex", "1", "Male"), ("sc_sex", "2", "Female")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sc_sex": ["Male", "Female"]}, schema={"sc_sex": pl.Enum(["Male", "Female"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_renamed_column_is_labeled_from_pre_rename_define_entries() -> None:
+    """A renamed column is labeled via the alias map, not its new (unknown) name."""
+    lf = pl.LazyFrame({"year": [2099] * 4, "fam_count": [1, 2, 3, 1]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["family"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+                "merge_columns": {},
+            },
+        }
+    )
+    define_lf = make_define_lf(
+        [("fam_count", "1", "One"), ("fam_count", "2", "Two"), ("fam_count", "3", "Three")]
+    )
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"family": ["One", "Two", "Three", "One"]},
+        schema={"family": pl.Enum(["One", "Two", "Three"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_merge_output_is_labeled_from_preferred_source_define_entries() -> None:
+    """A merge output is labeled via the alias map from its column_preferred source."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "hoursleep": [1, None], "hoursleep05": [None, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["sleep"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {},
+                "merge_columns": {
+                    "sleep": {
+                        "years": ["2099"],
+                        "column_preferred": "hoursleep",
+                        "column_fallback": "hoursleep05",
+                    }
+                },
+            },
+        }
+    )
+    define_lf = make_define_lf(
+        [("hoursleep", "1", "Less than 6 hours"), ("hoursleep", "2", "6 hours")]
+    )
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sleep": ["Less than 6 hours", "6 hours"]},
+        schema={"sleep": pl.Enum(["Less than 6 hours", "6 hours"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_rules_for_another_year_are_skipped() -> None:
+    """Rules scoped to other years do nothing, and the alias map stays empty."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "fam_count": [1, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["fam_count"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {"fam_count": {"years": ["2016"], "new_name": "family"}},
+                "merge_columns": {},
+            },
+        }
+    )
+    define_lf = make_define_lf([("fam_count", "1", "One"), ("fam_count", "2", "Two")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"fam_count": ["One", "Two"]}, schema={"fam_count": pl.Enum(["One", "Two"])}
+    )
+    assert_frame_equal(result, expected)
