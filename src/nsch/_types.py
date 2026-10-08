@@ -90,10 +90,13 @@ class TaggedNA(IntEnum):
 
 
 # Mapping of character STATA tags to Enum values for use in other modules
+# Bare letters are the canonical keys, matching pyreadstat and R.
+# The .do side carries a leading dot that consumers of `parse_do` output
+# add at the point of use.
 # See `TaggedNA` for further descriptions for these tags
 STATA_TAG_TO_SENTINEL = {
-    ".m": TaggedNA.NO_RESPONSE,
-    ".n": TaggedNA.NOT_IN_UNIVERSE,
-    ".l": TaggedNA.LOGICAL_SKIP,
-    ".d": TaggedNA.SUPPRESSED,
+    "m": TaggedNA.NO_RESPONSE,
+    "n": TaggedNA.NOT_IN_UNIVERSE,
+    "l": TaggedNA.LOGICAL_SKIP,
+    "d": TaggedNA.SUPPRESSED,
 }

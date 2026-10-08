@@ -3,49 +3,23 @@
 from __future__ import annotations
 
 import warnings
-from typing import TypedDict
+from typing import TYPE_CHECKING
 
 import polars as pl
 
 from nsch._types import TaggedNA
 from nsch.combine import apply_do_labels
 
+if TYPE_CHECKING:
+    from nsch.config import Config, MergeRule, RenameRule, TransformRule
+
 __all__ = [
-    "HarmonizeConfig",
-    "MergeRule",
-    "RenameRule",
-    "TransformValues",
-    "Transformations",
     "harmonize_year",
     "merge_vars",
     "rename_vars",
     "subset_vars",
     "transform_values",
 ]
-
-
-class RenameRule(TypedDict):
-    """One rename rule: the years it applies to, and the harmonized name."""
-
-    years: list[str]
-    new_name: str
-
-
-class MergeRule(TypedDict):
-    """One merge rule with its applicable years and source columns."""
-
-    years: list[str]
-    column_preferred: str
-    column_fallback: str
-
-
-class TransformValues(TypedDict):
-    """One transform rule: the years and values it applies to, and the new values and labels."""
-
-    years: list[str]
-    value: list[str]
-    new_value: list[str]
-    new_label: list[str]
 
 
 def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> pl.LazyFrame:
@@ -95,8 +69,9 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
     Examples
     --------
     >>> import polars as pl
+    >>> from nsch.config import RenameRule
     >>> lf = pl.LazyFrame({"gowhensick": [4, 8]})
-    >>> rule = {"gowhensick": {"years": ["2023"], "new_name": "k4q02_r"}}
+    >>> rule = {"gowhensick": RenameRule(years=["2023"], new_name="k4q02_r")}
     >>> rename_vars(lf, rule, 2023).collect().columns
     ['k4q02_r']
     """
@@ -106,9 +81,9 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
     year_str = str(year)
     mapping: dict[str, str] = {}
     for old, rule in renames.items():
-        if year_str not in rule["years"] or old not in present:
+        if year_str not in rule.years or old not in present:
             continue
-        new_name = rule["new_name"]
+        new_name = rule.new_name
         mapping[old] = new_name
         # A column's labels live in `<name>_label`; rename them together.
         old_label = f"{old}_label"
@@ -142,7 +117,7 @@ def rename_vars(lf: pl.LazyFrame, renames: dict[str, RenameRule], year: int) -> 
 
 
 def transform_values(
-    lf: pl.LazyFrame, transforms: dict[str, TransformValues], year: int
+    lf: pl.LazyFrame, transforms: dict[str, TransformRule], year: int
 ) -> pl.LazyFrame:
     """Apply value and label remapping rules to transform a single year's raw numeric pl.LazyFrame.
 
@@ -158,7 +133,7 @@ def transform_values(
     ----------
     lf : pl.LazyFrame
         One year's data before transforming.
-    transforms : dict[str, TransformValues]
+    transforms : dict[str, TransformRule]
         Maps a source column name to its transform. A transform only applies when ``year``
         is in the transform's ``years``.
     year : int
@@ -175,9 +150,10 @@ def transform_values(
     Examples
     --------
     >>> import polars as pl
+    >>> from nsch.config import TransformRule
     >>> lf = pl.LazyFrame({"sex": [1, 2, 1]})
     >>> transforms = {
-    ...     "sex": TransformValues(
+    ...     "sex": TransformRule.model_validate(
     ...         {
     ...             "years": ["2016"],
     ...             "value": ["1", "2"],
@@ -203,7 +179,7 @@ def transform_values(
     variable_names = set(schema.names())
 
     for transform_variable_name, details in transforms.items():
-        transform_years = details["years"]
+        transform_years = details.years
         if (transform_variable_name in variable_names) and (str(year) in transform_years):
             # Get column datatype for converting transform's string values
             column_dtype = schema[transform_variable_name]
@@ -219,15 +195,15 @@ def transform_values(
             # Create a mapping between values and new values/labels for the transform
             lookup = pl.DataFrame(
                 {
-                    transform_variable_name: pl.Series(details["value"]).cast(column_dtype),
-                    "_new_value": pl.Series(details["new_value"]).cast(column_dtype),
-                    "_new_label": details["new_label"],
+                    transform_variable_name: pl.Series(details.value).cast(column_dtype),
+                    "_new_value": pl.Series(details.new_value).cast(column_dtype),
+                    "_new_label": details.new_label,
                 }
             ).lazy()
             # if the number of values in the transform is not unique,
             # raise an error to protect against duplicate rows from a bad config
             if lookup.select(pl.col(transform_variable_name)).collect().n_unique() != len(
-                details["value"]
+                details.value
             ):
                 raise ValueError(
                     f"Duplicate values found in transform for variable {transform_variable_name}"
@@ -334,15 +310,14 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     Examples
     --------
     >>> import polars as pl
+    >>> from nsch.config import MergeRule
     >>> lf = pl.LazyFrame(
     ...     {"hoursleep": [1, 2, 3, 4], "hoursleep05": [None, None, 3, 4], "hhid": [5, 6, 7, 8]}
     ... )
-    >>> merges: dict[str, MergeRule] = {
-    ...     "sleep": {
-    ...         "years": ["2023"],
-    ...         "column_preferred": "hoursleep",
-    ...         "column_fallback": "hoursleep05",
-    ...     }
+    >>> merges = {
+    ...     "sleep": MergeRule(
+    ...         years=["2023"], column_preferred="hoursleep", column_fallback="hoursleep05"
+    ...     )
     ... }
     >>> merge_vars(lf, merges, 2023).collect()
     shape: (4, 2)
@@ -363,9 +338,9 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     variable_names = set(schema.names())
 
     for merged_variable_name, details in merges.items():
-        column_preferred = details["column_preferred"]
-        column_fallback = details["column_fallback"]
-        merge_years = details["years"]
+        column_preferred = details.column_preferred
+        column_fallback = details.column_fallback
+        merge_years = details.years
 
         if (
             str(year) in merge_years
@@ -411,26 +386,6 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     return merged_lf
 
 
-class Transformations(TypedDict):
-    """The three rule sections of ``variable-config.json``."""
-
-    transform: dict[str, TransformValues]
-    rename_columns: dict[str, RenameRule]
-    merge_columns: dict[str, MergeRule]
-
-
-class HarmonizeConfig(TypedDict):
-    """The parsed configuration ``harmonize_year`` consumes.
-
-    This is the plain-dict shape of ``variable-config.json``. A validated
-    Pydantic ``Config`` from the config layer produces exactly this shape via
-    ``model_dump()``, so the two layers connect without conversion code.
-    """
-
-    desired_variables: list[str]
-    transformations: Transformations
-
-
 def _build_alias_map(
     renames: dict[str, RenameRule], merges: dict[str, MergeRule], year: int
 ) -> dict[str, str]:
@@ -452,16 +407,16 @@ def _build_alias_map(
     alias: dict[str, str] = {}
     year_str = str(year)
     for old_name, rename in renames.items():
-        if year_str in rename["years"]:
-            alias[rename["new_name"]] = old_name
+        if year_str in rename.years:
+            alias[rename.new_name] = old_name
     for out_name, merge in merges.items():
-        if year_str in merge["years"]:
-            alias[out_name] = merge["column_preferred"]
+        if year_str in merge.years:
+            alias[out_name] = merge.column_preferred
     return alias
 
 
 def harmonize_year(
-    lf: pl.LazyFrame, config: HarmonizeConfig, year: int, define_lf: pl.LazyFrame
+    lf: pl.LazyFrame, config: Config, year: int, define_lf: pl.LazyFrame
 ) -> pl.LazyFrame:
     """Run one survey year through the full harmonization sequence.
 
@@ -475,8 +430,7 @@ def harmonize_year(
     lf
         One year's data as read by ``read_nsch_dta``.
     config
-        The parsed configuration (``HarmonizeConfig``). A Pydantic
-        ``Config`` can be passed as ``config.model_dump()``.
+        The validated configuration from ``read_config``.
     year
         The survey year of ``lf``; selects which rules apply.
     define_lf
@@ -490,15 +444,18 @@ def harmonize_year(
     Examples
     --------
     >>> import polars as pl
+    >>> from nsch.config import Config
     >>> lf = pl.LazyFrame({"year": [2099, 2099], "fam_count": [1, 3]})
-    >>> config: HarmonizeConfig = {
-    ...     "desired_variables": ["family"],
-    ...     "transformations": {
-    ...         "transform": {},
-    ...         "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
-    ...         "merge_columns": {},
-    ...     },
-    ... }
+    >>> config = Config.model_validate(
+    ...     {
+    ...         "desired_variables": ["family"],
+    ...         "transformations": {
+    ...             "transform": {},
+    ...             "rename_columns": {"fam_count": {"years": ["2099"], "new_name": "family"}},
+    ...             "merge_columns": {},
+    ...         },
+    ...     }
+    ... )
     >>> define_lf = pl.LazyFrame(
     ...     {
     ...         "variable": ["fam_count"] * 3,
@@ -517,12 +474,10 @@ def harmonize_year(
     │ Three  │
     └────────┘
     """
-    transformations = config["transformations"]
-    lf = transform_values(lf, transformations["transform"], year)
-    lf = rename_vars(lf, transformations["rename_columns"], year)
-    lf = merge_vars(lf, transformations["merge_columns"], year)
-    lf = subset_vars(lf, config["desired_variables"])
-    alias = _build_alias_map(
-        transformations["rename_columns"], transformations["merge_columns"], year
-    )
+    rules = config.transformations
+    lf = transform_values(lf, rules.transform, year)
+    lf = rename_vars(lf, rules.rename_columns, year)
+    lf = merge_vars(lf, rules.merge_columns, year)
+    lf = subset_vars(lf, config.desired_variables)
+    alias = _build_alias_map(rules.rename_columns, rules.merge_columns, year)
     return apply_do_labels(lf, define_lf, alias)

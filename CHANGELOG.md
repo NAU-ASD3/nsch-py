@@ -8,9 +8,18 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.4 (PR#88)
+## 2026.10.7.1 (PR#88)
 
 - Added `harmonize_year`, wiring transform, rename, merge, subset, and labeling for one survey year with an alias map so renamed and merged columns are labeled from their original `.do` entries
+- The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
+
+## 2026.10.7 (PR#86)
+
+- Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
+## 2026.10.4 (PR#78)
+
+- Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
+- `apply_do_labels` now adds the leading dot at the point of use to match `parse_do`'s dotted output; a seam test runs a real `.do` file through both to keep the two in agreement
 
 ## 2026.9.14.2 (PR#77)
 

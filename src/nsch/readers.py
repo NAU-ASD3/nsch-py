@@ -8,8 +8,7 @@ from pathlib import Path
 import polars as pl
 import pyreadstat
 
-import nsch._types as types
-from nsch._types import DoSpec
+from nsch._types import STATA_TAG_TO_SENTINEL, DoSpec
 
 __all__ = ["parse_do", "read_nsch_dta"]
 
@@ -118,13 +117,6 @@ READSTAT_TO_POLARS = {
     "string": pl.Utf8,
 }
 
-TAGGED_NA_MAP = {
-    "m": types.TaggedNA.NO_RESPONSE,
-    "n": types.TaggedNA.NOT_IN_UNIVERSE,
-    "l": types.TaggedNA.LOGICAL_SKIP,
-    "d": types.TaggedNA.SUPPRESSED,
-}
-
 
 def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) -> pl.LazyFrame:
     """Helper function for ``read_nsch_dta`` to map each missingness type per column
@@ -153,7 +145,7 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
         [
             (
                 pl.col(col).replace_strict(
-                    TAGGED_NA_MAP, default=pl.col(col), return_dtype=polars_schema[col]
+                    STATA_TAG_TO_SENTINEL, default=pl.col(col), return_dtype=polars_schema[col]
                 )
                 if col in meta.missing_user_values
                 else pl.col(col)
