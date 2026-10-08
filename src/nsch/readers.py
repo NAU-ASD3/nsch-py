@@ -30,19 +30,42 @@ def parse_do(year_do_path: str | Path) -> DoSpec:
 
     Examples
     --------
-    Parse the 2024 NSCH topical do-file and inspect the ``a1_active``
-    variable label:
+    Write a small do-file to a temporary directory and parse it. Real NSCH
+    do-files put one value per ``label define`` line, so the example does too:
 
-    >>> result = parse_do("nsch_2024_topical.do")
-    >>> result.var.collect().filter(pl.col("variable") == "a1_active")
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> lines = [
+    ...     'label var sc_sex "Sex of child"',
+    ...     'label define sc_sex_lab 1 "Male"',
+    ...     'label define sc_sex_lab 2 "Female", add',
+    ...     'label define sc_sex_lab .m "Missing", add',
+    ... ]
+    >>> with tempfile.TemporaryDirectory() as tmpdir:
+    ...     do_path = Path(tmpdir) / "tiny.do"
+    ...     _ = do_path.write_text("\\n".join(lines))
+    ...     spec = parse_do(do_path)
+    ...     var, define = spec.var.collect(), spec.define.collect()
+    >>> var
     shape: (1, 2)
-    ┌───────────┬───────────────────────┐
-    │ variable  ┆ desc                  │
-    │ ---       ┆ ---                   │
-    │ str       ┆ str                   │
-    ╞═══════════╪═══════════════════════╡
-    │ a1_active ┆ Adult 1 - Active Duty │
-    └───────────┴───────────────────────┘
+    ┌──────────┬──────────────┐
+    │ variable ┆ desc         │
+    │ ---      ┆ ---          │
+    │ str      ┆ str          │
+    ╞══════════╪══════════════╡
+    │ sc_sex   ┆ Sex of child │
+    └──────────┴──────────────┘
+    >>> define
+    shape: (3, 3)
+    ┌──────────┬───────┬─────────┐
+    │ variable ┆ value ┆ desc    │
+    │ ---      ┆ ---   ┆ ---     │
+    │ str      ┆ str   ┆ str     │
+    ╞══════════╪═══════╪═════════╡
+    │ sc_sex   ┆ 1     ┆ Male    │
+    │ sc_sex   ┆ 2     ┆ Female  │
+    │ sc_sex   ┆ .m    ┆ Missing │
+    └──────────┴───────┴─────────┘
     """
 
     path = Path(year_do_path)
