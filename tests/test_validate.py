@@ -6,7 +6,14 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.validate import check_label_consistency, check_na_rates, check_year_coverage
+from nsch._types import DoSpec
+from nsch.config import Config, Transformations
+from nsch.validate import (
+    check_config_do,
+    check_label_consistency,
+    check_na_rates,
+    check_year_coverage,
+)
 
 # Testing For ``check_label_consistency``
 
@@ -279,3 +286,82 @@ def test_missing_year_column_raises_value_error() -> None:
     df = pl.DataFrame({"x": [1, 2]})
     with pytest.raises(ValueError, match="year"):
         check_na_rates(df)
+
+
+# Testing for check_config_do
+def test_reports_missing_desired_variable() -> None:
+    config = Config(desired_variables=["x", "y"], transformations=Transformations())
+    do_spec = DoSpec(
+        var=pl.DataFrame(
+            {
+                "variable": ["x"],
+                "desc": ["Example variable"],
+            }
+        ).lazy(),
+        define=pl.DataFrame(
+            {
+                "variable": [],
+                "value": [],
+                "desc": [],
+            },
+            schema={
+                "variable": pl.Utf8,
+                "value": pl.Utf8,
+                "desc": pl.Utf8,
+            },
+        ).lazy(),
+    )
+    result = check_config_do(config, do_spec, year=2024)
+    expected = pl.DataFrame(
+        {
+            "variable": ["y"],
+            "year": [2024],
+            "source": ["desired_variables"],
+            "issue": ["missing_variable"],
+            "value": [None],
+        },
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+            "value": pl.Utf8,
+        },
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_no_missing_desired_variables() -> None:
+    config = Config(
+        desired_variables=["x", "y"],
+        transformations=Transformations(),
+    )
+    do_spec = DoSpec(
+        var=pl.DataFrame(
+            {
+                "variable": ["x", "y"],
+                "desc": ["Example x", "Example y"],
+            }
+        ).lazy(),
+        define=pl.DataFrame(
+            {"variable": [], "value": [], "desc": []},
+            schema={
+                "variable": pl.Utf8,
+                "value": pl.Utf8,
+                "desc": pl.Utf8,
+            },
+        ).lazy(),
+    )
+    result = check_config_do(config, do_spec, year=2024)
+
+    expected = pl.DataFrame(
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+            "value": pl.Utf8,
+        },
+    )
+
+    assert_frame_equal(result, expected)
