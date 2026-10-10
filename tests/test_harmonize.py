@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -20,9 +20,6 @@ from nsch.harmonize import (
     subset_vars,
     transform_values,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_value_is_remapped_for_matching_year_and_label_column_is_created():
@@ -361,7 +358,8 @@ def test_no_merge_applied_when_only_one_column_present() -> None:
 # Tests for impute_a1_grade_2016
 # Function to create Synthetic .dta in data/make_fixtures.py
 
-PATH_2016_DTA: Path = "tests/data/2016_impute_test.dta"
+PATH_2016_DTA: Path = Path("tests/data/2016_impute_test.dta")
+PATH_2016_LARGE_DTA: Path = Path("tests/data/2016_large_impute_test.dta")
 
 
 # Helper: build a minimal combined.dt with 2016 (NA a1_grade) and non-2016 rows (populated a1_grade)
@@ -491,10 +489,10 @@ def test_a1_grade_imputation_is_reproducable_with_same_seed() -> None:
 
 # test imputation is different when a different seed is used
 def test_a1_grade_imputation_is_different_with_different_seed() -> None:
-    combine_df = make_combined_test_dataframe(10, 40)
+    combine_df = make_combined_test_dataframe(100, 400)
     # DataFrame is not modified in-place like the R version, so no need for 2 combine frames
-    imputed_df_1 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=1)
-    imputed_df_2 = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=2)
+    imputed_df_1 = impute_a1_grade_2016(combine_df, PATH_2016_LARGE_DTA, seed=1)
+    imputed_df_2 = impute_a1_grade_2016(combine_df, PATH_2016_LARGE_DTA, seed=2)
     assert_frame_not_equal(imputed_df_1, imputed_df_2)
 
 
@@ -502,9 +500,13 @@ def test_a1_grade_imputation_is_different_with_different_seed() -> None:
 def test_a1_grade_imputation_modifies_only_2016_rows() -> None:
     combine_df = make_combined_test_dataframe(10, 40)
     imputed_df = impute_a1_grade_2016(combine_df, PATH_2016_DTA, seed=1)
-    assert imputed_df["a1_grade"].isna.sum() == 0
-    assert imputed_df["higrade"].isna.sum() == 0
-    assert imputed_df["higrade_tvis"].isna.sum() == 0
+    # make sure non-2016 rows are unchanged
+    assert_frame_equal(
+        combine_df.filter(pl.col("year") != 2016), imputed_df.filter(pl.col("year") != 2016)
+    )
+    assert imputed_df["a1_grade"].is_null().sum() == 0
+    assert imputed_df["higrade"].is_null().sum() == 0
+    assert imputed_df["higrade_tvis"].is_null().sum() == 0
 
 
 # test 2016 rows with non-impute flags are not modified

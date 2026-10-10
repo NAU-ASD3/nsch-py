@@ -2,6 +2,8 @@
 This script is the source of truth for .dta files used in testing.
 """
 
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 import pyreadstat
@@ -80,7 +82,7 @@ def create_no_stratum_data() -> None:
 
 
 # create a synthetic 2016 .dta with hhid, a1_grade_if, a1_grade_i to test impute_a1_grade_2016()
-def create_2016_dta(n: int = 10) -> None:
+def create_2016_dta(n: int = 10, filename: Path = "2016_impute_test") -> None:
     df = pl.DataFrame(
         {
             "year": [2016] * n,
@@ -93,7 +95,7 @@ def create_2016_dta(n: int = 10) -> None:
 
     pyreadstat.write_dta(
         df,
-        "tests/data/2016_impute_test.dta",
+        dst_path=Path("tests/data") / (filename + ".dta"),
     )
 
 
@@ -101,3 +103,4 @@ create_tagged_missing_dta()
 create_mixed_types_dta()
 create_no_stratum_data()
 create_2016_dta()
+create_2016_dta(n=100, filename="2016_large_impute_test")
