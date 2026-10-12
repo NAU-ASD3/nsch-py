@@ -398,6 +398,19 @@ def _build_alias_map(
     merge output from its ``column_preferred`` source. Mirrors R's
     ``build_alias_map``.
 
+    Only the preferred source's define entries are used for a merge output.
+    Values taken from the fallback source keep their labels through the
+    ``_label`` companion column, which ``merge_vars`` merges alongside the
+    data whenever both sources have one (that is, when a transform rule gave
+    them labels).
+
+    Renames run before merges, so a merge rule that targets a renamed
+    column names it by its new name, which the .do file never defined. In
+    that case the merge output's alias follows the rename back to the
+    original .do name. R stops at the new name and leaves that column
+    unlabeled; the bundled config has no merge on a renamed column, so the
+    two agree on every real year.
+
     Entries for columns that do not end up in the frame (for example a
     merge whose source columns were absent that year) are harmless, because
     ``apply_do_labels`` only consults the alias for columns it actually
@@ -411,7 +424,8 @@ def _build_alias_map(
             alias[rename.new_name] = old_name
     for out_name, merge in merges.items():
         if year_str in merge.years:
-            alias[out_name] = merge.column_preferred
+            # A preferred source that is itself a rename target maps back to its .do name.
+            alias[out_name] = alias.get(merge.column_preferred, merge.column_preferred)
     return alias
 
 
@@ -427,13 +441,13 @@ def harmonize_year(
 
     Parameters
     ----------
-    lf
+    lf : pl.LazyFrame
         One year's data as read by ``read_nsch_dta``.
-    config
+    config : Config
         The validated configuration from ``read_config``.
-    year
+    year : int
         The survey year of ``lf``; selects which rules apply.
-    define_lf
+    define_lf : pl.LazyFrame
         The ``define`` frame of that year's ``DoSpec`` from ``parse_do``.
 
     Returns
