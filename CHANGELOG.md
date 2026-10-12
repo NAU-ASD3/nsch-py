@@ -12,6 +12,7 @@ so each version stays unique and the date stays honest.
 
 - Added `harmonize_year`, wiring transform, rename, merge, subset, and labeling for one survey year with an alias map so renamed and merged columns are labeled from their original `.do` entries
 - The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
+- `harmonize_year`'s alias map only includes rename and merge rules that fire on the frame, so a rule whose year list includes a year where the column already has its new name leaves that column labeled under its own name (R reaches the same labels through a fallback in its `apply_do_labels`, R #52). A merge whose preferred source was renamed that year is labeled from the pre-rename `.do` name, where R leaves it unlabeled
 
 ## 2026.10.7 (PR#86)
 
