@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.12 (PR#81)
+
+- Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
+
 ## 2026.10.7 (PR#86)
 
 - Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
