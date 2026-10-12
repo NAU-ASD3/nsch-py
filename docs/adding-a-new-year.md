@@ -157,9 +157,12 @@ For example:
 > 998 is never a real survey response (no NSCH code exceeds 400). It is the
 > logical-skip sentinel written at read time. A few variables deliberately
 > recode it into a substantive category because the survey's routing makes
-> the skip informative: a respondent was routed past this question because a
-> prior answer established there is no usual place, or past a visit-count
-> question because there were no visits to count. Only add a rule like this
+> the skip informative. In the example above, a respondent who answers "No"
+> to `k4q01` (is there a place this child usually goes when sick?) is routed
+> past `k4q02_r` (where is that place?), so a 998 in `k4q02_r` means "No
+> usual place." Visit-count questions such as `k4q20r` work the same way: a
+> respondent with no visits is routed past the count because there is
+> nothing to count. Only add a rule like this
 > when the `.do` file's routing confirms the skip logically implies the
 > answer, and never recode 996, 997, or 999, which represent genuine
 > missingness and must fall through to null at labeling.
