@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import warnings
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import polars as pl
+import pyreadstat
 import pytest
 from polars.testing import assert_frame_equal
 from pydantic import BaseModel
@@ -13,12 +14,17 @@ from pydantic import BaseModel
 from nsch.combine import apply_do_labels
 from nsch.config import Config, MergeRule, RenameRule, TransformRule
 from nsch.harmonize import (
+    _build_alias_map,
     harmonize_year,
     merge_vars,
     rename_vars,
     subset_vars,
     transform_values,
 )
+from nsch.readers import read_nsch_dta
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -540,5 +546,94 @@ def test_rules_for_another_year_are_skipped() -> None:
 
     expected = pl.DataFrame(
         {"fam_count": ["One", "Two"]}, schema={"fam_count": pl.Enum(["One", "Two"])}
+    )
+    assert_frame_equal(result, expected)
+    rules_ = config.transformations
+    assert _build_alias_map(rules_.rename_columns, rules_.merge_columns, 2099) == {}
+
+
+def test_merge_alias_wins_when_a_rename_and_a_merge_share_an_output_name() -> None:
+    """A merge entry overwrites a rename entry with the same output name."""
+    renames = rules(RenameRule, {"sleep_old": {"years": ["2099"], "new_name": "sleep"}})
+    merges = rules(
+        MergeRule,
+        {
+            "sleep": {
+                "years": ["2099"],
+                "column_preferred": "hoursleep",
+                "column_fallback": "hoursleep05",
+            }
+        },
+    )
+
+    assert _build_alias_map(renames, merges, 2099) == {"sleep": "hoursleep"}
+
+
+def test_merge_on_a_renamed_column_is_labeled_from_the_original_define_entries() -> None:
+    """A merge whose preferred source was renamed first is labeled by the pre-rename name."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "hrs": [1, None], "hoursleep05": [None, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["sleep"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {"hrs": {"years": ["2099"], "new_name": "hoursleep"}},
+                "merge_columns": {
+                    "sleep": {
+                        "years": ["2099"],
+                        "column_preferred": "hoursleep",
+                        "column_fallback": "hoursleep05",
+                    }
+                },
+            },
+        }
+    )
+    define_lf = make_define_lf([("hrs", "1", "Less than 6 hours"), ("hrs", "2", "6 hours")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sleep": ["Less than 6 hours", "6 hours"]},
+        schema={"sleep": pl.Enum(["Less than 6 hours", "6 hours"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_transform_label_survives_the_read_nsch_dta_path(tmp_path: Path) -> None:
+    """A transform's new label becomes a real Enum category on data read from a .dta file.
+
+    Mirrors R's truelength=0 regression test: the data goes through
+    read_nsch_dta, and a transform recodes the 998 skip sentinel to a new
+    value whose label exists only on the transform rule, not in the .do file.
+    """
+    path = tmp_path / "test.dta"
+    # read_nsch_dta requires a stratum column; subset_vars drops it afterward.
+    raw = pl.DataFrame({"year": [2099] * 3, "stratum": [1] * 3, "test_var": [1, 2, 998]})
+    pyreadstat.write_dta(raw, path)
+    lf = read_nsch_dta(path)
+    config = Config.model_validate(
+        {
+            "desired_variables": ["test_var"],
+            "transformations": {
+                "transform": {
+                    "test_var": {
+                        "years": ["2099"],
+                        "value": ["998"],
+                        "new_value": ["5"],
+                        "new_label": ["Override label"],
+                    }
+                },
+                "rename_columns": {},
+                "merge_columns": {},
+            },
+        }
+    )
+    define_lf = make_define_lf([("test_var", "1", "One"), ("test_var", "2", "Two")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"test_var": ["One", "Two", "Override label"]},
+        schema={"test_var": pl.Enum(["One", "Two", "Override label"])},
     )
     assert_frame_equal(result, expected)
