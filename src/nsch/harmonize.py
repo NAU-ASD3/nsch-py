@@ -387,7 +387,10 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
 
 
 def _build_alias_map(
-    renames: dict[str, RenameRule], merges: dict[str, MergeRule], year: int
+    renames: dict[str, RenameRule],
+    merges: dict[str, MergeRule],
+    year: int,
+    columns: list[str],
 ) -> dict[str, str]:
     """Map post-rename and merge-output column names back to their .do names.
 
@@ -395,37 +398,61 @@ def _build_alias_map(
     runs, renamed columns carry names the .do file never defined, and merge
     outputs are brand new. This map tells it where to look instead: a
     renamed column is labeled from its pre-rename define entries, and a
-    merge output from its ``column_preferred`` source. Mirrors R's
-    ``build_alias_map``.
+    merge output from its ``column_preferred`` source.
 
-    Only the preferred source's define entries are used for a merge output.
-    Values taken from the fallback source keep their labels through the
-    ``_label`` companion column, which ``merge_vars`` merges alongside the
-    data whenever both sources have one (that is, when a transform rule gave
-    them labels).
+    Parameters
+    ----------
+    renames : dict[str, RenameRule]
+        The config's ``rename_columns`` rules.
+    merges : dict[str, MergeRule]
+        The config's ``merge_columns`` rules.
+    year : int
+        The survey year; only rules listing it are considered.
+    columns : list[str]
+        The frame's column names before ``rename_vars`` runs.
 
-    Renames run before merges, so a merge rule that targets a renamed
-    column names it by its new name, which the .do file never defined. In
-    that case the merge output's alias follows the rename back to the
-    original .do name. R stops at the new name and leaves that column
-    unlabeled; the bundled config has no merge on a renamed column, so the
-    two agree on every real year.
+    Returns
+    -------
+    dict[str, str]
+        Output column name mapped to the .do variable to label it from.
 
-    Entries for columns that do not end up in the frame (for example a
-    merge whose source columns were absent that year) are harmless, because
-    ``apply_do_labels`` only consults the alias for columns it actually
-    sees. If a rename and a merge produce the same output name, the merge
-    entry wins, matching R's assignment order.
+    Notes
+    -----
+    An entry is added only for a rule that actually fires on this frame:
+    a rename whose old column is present, and a merge whose two sources
+    are present after the renames, matching the conditions in
+    ``rename_vars`` and ``merge_vars``. A rule whose year list includes a
+    year where its column already carries the new name therefore adds
+    nothing, and the column is labeled under its own name. R's
+    ``build_alias_map`` adds an entry for every rule listing the year and
+    reaches the same labels through a fallback inside ``apply_do_labels``
+    (R #52).
+
+    When a merge's ``column_preferred`` was produced by a rename that fired,
+    the merge output's entry follows the rename back to the original .do
+    name. R stops at the new name and leaves that column unlabeled; the
+    bundled config has no merge on a renamed column, so the two agree on
+    every real year.
+
+    Only the preferred source's define entries label a merge output. Labels
+    from the fallback source survive only when a transform rule wrote them
+    and both sources have a ``_label`` column, which ``merge_vars`` then
+    merges alongside the data. If a rename and a merge produce the same
+    output name, the merge entry wins, matching R's assignment order.
     """
-    alias: dict[str, str] = {}
     year_str = str(year)
+    present = set(columns)
+    renamed: dict[str, str] = {}
     for old_name, rename in renames.items():
-        if year_str in rename.years:
-            alias[rename.new_name] = old_name
+        if year_str in rename.years and old_name in present:
+            renamed[rename.new_name] = old_name
+    # merge_vars sees the names after the renames.
+    after_rename = (present - set(renamed.values())) | set(renamed)
+    alias = dict(renamed)
     for out_name, merge in merges.items():
-        if year_str in merge.years:
-            # A preferred source that is itself a rename target maps back to its .do name.
-            alias[out_name] = alias.get(merge.column_preferred, merge.column_preferred)
+        sources_present = {merge.column_preferred, merge.column_fallback} <= after_rename
+        if year_str in merge.years and sources_present:
+            alias[out_name] = renamed.get(merge.column_preferred, merge.column_preferred)
     return alias
 
 
@@ -437,7 +464,8 @@ def harmonize_year(
     Applies, in order: ``transform_values``, ``rename_vars``,
     ``merge_vars``, ``subset_vars``, then ``apply_do_labels`` with an alias
     map so renamed and merged columns are labeled from the .do entries of
-    their original source variables. Mirrors R's ``harmonize_year``.
+    their original source variables. Mirrors R's ``harmonize_year``, with
+    the two differences listed under Notes.
 
     Parameters
     ----------
@@ -454,6 +482,28 @@ def harmonize_year(
     -------
     pl.LazyFrame
         The harmonized, labeled year, restricted to ``desired_variables``.
+
+    Raises
+    ------
+    ValueError
+        From ``transform_values`` when a rule lists a value twice, and from
+        ``rename_vars`` when two rules target one name or a target collides
+        with an existing column.
+
+    Warns
+    -----
+    UserWarning
+        From ``subset_vars`` for each desired variable missing from the frame.
+
+    Notes
+    -----
+    Two differences from R, both in how the alias map is built (see
+    ``_build_alias_map``). Aliases come only from rules that fire on this
+    frame, so a rule whose year list overshoots leaves the natively named
+    column labeled under its own name; R gets the same result from a
+    fallback in its ``apply_do_labels``. And a merge whose preferred source
+    was renamed that year is labeled from the pre-rename name, where R
+    leaves it unlabeled. The bundled config never hits the second case.
 
     Examples
     --------
@@ -490,8 +540,10 @@ def harmonize_year(
     """
     rules = config.transformations
     lf = transform_values(lf, rules.transform, year)
+    # The alias map needs the names before renaming to know which rules fire.
+    columns = lf.collect_schema().names()
     lf = rename_vars(lf, rules.rename_columns, year)
     lf = merge_vars(lf, rules.merge_columns, year)
     lf = subset_vars(lf, config.desired_variables)
-    alias = _build_alias_map(rules.rename_columns, rules.merge_columns, year)
+    alias = _build_alias_map(rules.rename_columns, rules.merge_columns, year, columns)
     return apply_do_labels(lf, define_lf, alias)
