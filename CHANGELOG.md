@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.12.2 (PR#90)
+
+- Added `check_config_do` to validate desired configuration variables against a year's DoSpec.
+- Accounted for year specific rename and merge rules to avoid incorrectly reporting harmonized variables as missing.
+- Added regression tests and documentation, including a doctest example.
 ## 2026.10.12.1 (PR#92)
 
 - Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean

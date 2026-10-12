@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import polars as pl
 
-__all__ = ["check_label_consistency", "check_na_rates", "check_year_coverage"]
+if TYPE_CHECKING:
+    from nsch._types import DoSpec
+    from nsch.config import Config
+
+__all__ = ["check_config_do", "check_label_consistency", "check_na_rates", "check_year_coverage"]
 
 
 def check_label_consistency(df: pl.DataFrame) -> pl.DataFrame:
@@ -257,5 +263,94 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
             "n_years_data": pl.Int64,
             "n_years_total": pl.Int64,
             "missing_years": pl.Utf8,
+        },
+    )
+
+
+def check_config_do(config: Config, do_spec: DoSpec, year: int) -> pl.DataFrame:
+    """Report desired variables missing from a year's DoSpec.
+
+    Check whether each desired variable is available directly in the
+    year's DoSpec or can be produced through a year-specific rename
+    or merge rule.
+
+    Parameters
+    ----------
+    config : Config
+        Configuration containing desired variables and transformation rules.
+    do_spec : DoSpec
+        Parsed Stata .do specification for the survey year.
+    year : int
+        Survey year being validated.
+
+    Returns
+    -------
+    pl.DataFrame
+        One row per missing desired variable, with columns ``variable``,
+        ``year``, ``source``, and ``issue``. Returns a typed empty DataFrame
+        when all desired variables are available.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> from nsch.config import Config, Transformations
+    >>> from nsch._types import DoSpec
+    >>> config = Config(
+    ...     desired_variables=["x", "y"],
+    ...     transformations=Transformations(),
+    ... )
+    >>> do_spec = DoSpec(
+    ...     var=pl.DataFrame({"variable": ["x"]}).lazy(),
+    ...     define=pl.DataFrame(
+    ...         schema={
+    ...             "variable": pl.Utf8,
+    ...             "value": pl.Utf8,
+    ...             "desc": pl.Utf8,
+    ...         }
+    ...     ).lazy(),
+    ... )
+    >>> result = check_config_do(config, do_spec, year=2024)
+    >>> result["variable"].to_list()
+    ['y']
+    """
+    do_variables = set(do_spec.var.collect()["variable"].to_list())
+    available_variables = do_variables.copy()
+    for old_name, rule in config.transformations.rename_columns.items():
+        if str(year) in rule.years and old_name in do_variables:
+            available_variables.add(rule.new_name)
+
+    do_variables = set(do_spec.var.collect()["variable"].to_list())
+    available_variables = do_variables.copy()
+
+    for old_name, rename_rule in config.transformations.rename_columns.items():
+        if str(year) in rename_rule.years and old_name in do_variables:
+            available_variables.add(rule.new_name)
+
+    for output_name, merge_rule in config.transformations.merge_columns.items():
+        if str(year) in merge_rule.years and (
+            merge_rule.column_preferred in do_variables
+            or merge_rule.column_fallback in do_variables
+        ):
+            available_variables.add(output_name)
+
+    missing_variables = set(config.desired_variables) - available_variables
+
+    rows = [
+        {
+            "variable": variable,
+            "year": year,
+            "source": "desired_variables",
+            "issue": "missing_variable",
+        }
+        for variable in sorted(missing_variables)
+    ]
+
+    return pl.DataFrame(
+        rows,
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
         },
     )
