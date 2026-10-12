@@ -318,14 +318,12 @@ def test_reports_missing_desired_variable() -> None:
             "year": [2024],
             "source": ["desired_variables"],
             "issue": ["missing_variable"],
-            "value": [None],
         },
         schema={
             "variable": pl.Utf8,
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
-            "value": pl.Utf8,
         },
     )
     assert_frame_equal(result, expected)
@@ -360,7 +358,6 @@ def test_no_missing_desired_variables() -> None:
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
-            "value": pl.Utf8,
         },
     )
 
@@ -400,7 +397,6 @@ def test_renamed_variable_not_reported_missing() -> None:
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
-            "value": pl.Utf8,
         },
     )
 
@@ -444,7 +440,6 @@ def test_merged_variable_not_reported_missing() -> None:
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
-            "value": pl.Utf8,
         },
     )
 
@@ -488,7 +483,6 @@ def test_merged_variable_with_fallback_not_reported_missing() -> None:
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
-            "value": pl.Utf8,
         },
     )
 
