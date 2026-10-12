@@ -7,7 +7,7 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from nsch._types import DoSpec
-from nsch.config import Config, RenameRule, Transformations
+from nsch.config import Config, MergeRule, RenameRule, Transformations
 from nsch.validate import (
     check_config_do,
     check_label_consistency,
@@ -381,6 +381,94 @@ def test_renamed_variable_not_reported_missing() -> None:
                     "x",
                 ],
                 "desc": ["Example variable"],
+            }
+        ).lazy(),
+        define=pl.DataFrame(
+            {"variable": [], "value": [], "desc": []},
+            schema={
+                "variable": pl.Utf8,
+                "value": pl.Utf8,
+                "desc": pl.Utf8,
+            },
+        ).lazy(),
+    )
+    result = check_config_do(config, do_spec, year=2024)
+
+    expected = pl.DataFrame(
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+            "value": pl.Utf8,
+        },
+    )
+
+    assert_frame_equal(result, expected)
+
+
+def test_merged_variable_not_reported_missing() -> None:
+    config = Config(
+        desired_variables=["sleep"],
+        transformations=Transformations(
+            merge_columns={
+                "sleep": MergeRule(
+                    years=["2024"],
+                    column_preferred="hoursleep",
+                    column_fallback="hoursleep05",
+                ),
+            },
+        ),
+    )
+    do_spec = DoSpec(
+        var=pl.DataFrame(
+            {
+                "variable": ["hoursleep"],
+                "desc": ["Hours of sleep"],
+            }
+        ).lazy(),
+        define=pl.DataFrame(
+            {"variable": [], "value": [], "desc": []},
+            schema={
+                "variable": pl.Utf8,
+                "value": pl.Utf8,
+                "desc": pl.Utf8,
+            },
+        ).lazy(),
+    )
+    result = check_config_do(config, do_spec, year=2024)
+
+    expected = pl.DataFrame(
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+            "value": pl.Utf8,
+        },
+    )
+
+    assert_frame_equal(result, expected)
+
+
+def test_merged_variable_with_fallback_not_reported_missing() -> None:
+    config = Config(
+        desired_variables=["sleep"],
+        transformations=Transformations(
+            merge_columns={
+                "sleep": MergeRule(
+                    years=["2024"],
+                    column_preferred="hoursleep",
+                    column_fallback="hoursleep05",
+                ),
+            },
+        ),
+    )
+    do_spec = DoSpec(
+        var=pl.DataFrame(
+            {
+                "variable": ["hoursleep05"],
+                "desc": ["Hours of sleep"],
             }
         ).lazy(),
         define=pl.DataFrame(

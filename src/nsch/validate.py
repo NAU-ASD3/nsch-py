@@ -275,7 +275,22 @@ def check_config_do(config: Config, do_spec: DoSpec, year: int) -> pl.DataFrame:
         if str(year) in rule.years and old_name in do_variables:
             available_variables.add(rule.new_name)
 
+    do_variables = set(do_spec.var.collect()["variable"].to_list())
+    available_variables = do_variables.copy()
+
+    for old_name, rename_rule in config.transformations.rename_columns.items():
+        if str(year) in rename_rule.years and old_name in do_variables:
+            available_variables.add(rule.new_name)
+
+    for output_name, merge_rule in config.transformations.merge_columns.items():
+        if str(year) in merge_rule.years and (
+            merge_rule.column_preferred in do_variables
+            or merge_rule.column_fallback in do_variables
+        ):
+            available_variables.add(output_name)
+
     missing_variables = set(config.desired_variables) - available_variables
+
     rows = [
         {
             "variable": variable,
