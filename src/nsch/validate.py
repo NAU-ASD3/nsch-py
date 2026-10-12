@@ -270,7 +270,12 @@ def check_year_coverage(df: pl.DataFrame) -> pl.DataFrame:
 def check_config_do(config: Config, do_spec: DoSpec, year: int) -> pl.DataFrame:
     """Report mismatches between configuration and a year's DoSpec"""
     do_variables = set(do_spec.var.collect()["variable"].to_list())
-    missing_variables = set(config.desired_variables) - do_variables
+    available_variables = do_variables.copy()
+    for old_name, rule in config.transformations.rename_columns.items():
+        if str(year) in rule.years and old_name in do_variables:
+            available_variables.add(rule.new_name)
+
+    missing_variables = set(config.desired_variables) - available_variables
     rows = [
         {
             "variable": variable,
