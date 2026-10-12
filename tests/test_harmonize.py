@@ -549,7 +549,8 @@ def test_rules_for_another_year_are_skipped() -> None:
     )
     assert_frame_equal(result, expected)
     rules_ = config.transformations
-    assert _build_alias_map(rules_.rename_columns, rules_.merge_columns, 2099) == {}
+    columns = ["year", "fam_count"]
+    assert _build_alias_map(rules_.rename_columns, rules_.merge_columns, 2099, columns) == {}
 
 
 def test_merge_alias_wins_when_a_rename_and_a_merge_share_an_output_name() -> None:
@@ -566,7 +567,9 @@ def test_merge_alias_wins_when_a_rename_and_a_merge_share_an_output_name() -> No
         },
     )
 
-    assert _build_alias_map(renames, merges, 2099) == {"sleep": "hoursleep"}
+    columns = ["sleep_old", "hoursleep", "hoursleep05"]
+
+    assert _build_alias_map(renames, merges, 2099, columns) == {"sleep": "hoursleep"}
 
 
 def test_merge_on_a_renamed_column_is_labeled_from_the_original_define_entries() -> None:
@@ -602,9 +605,10 @@ def test_merge_on_a_renamed_column_is_labeled_from_the_original_define_entries()
 def test_transform_label_survives_the_read_nsch_dta_path(tmp_path: Path) -> None:
     """A transform's new label becomes a real Enum category on data read from a .dta file.
 
-    Mirrors R's truelength=0 regression test: the data goes through
-    read_nsch_dta, and a transform recodes the 998 skip sentinel to a new
-    value whose label exists only on the transform rule, not in the .do file.
+    Ported from R's truelength=0 regression test. The data.table bug that test
+    guards can't happen with LazyFrames, but the read path still matters here:
+    read_nsch_dta returns test_var as Float64 where a literal frame gives Int64,
+    and the transform must still recode 998 and label it from the rule alone.
     """
     path = tmp_path / "test.dta"
     # read_nsch_dta requires a stratum column; subset_vars drops it afterward.
@@ -635,5 +639,65 @@ def test_transform_label_survives_the_read_nsch_dta_path(tmp_path: Path) -> None
     expected = pl.DataFrame(
         {"test_var": ["One", "Two", "Override label"]},
         schema={"test_var": pl.Enum(["One", "Two", "Override label"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_rename_rule_listing_a_year_where_the_column_is_native_leaves_it_labeled() -> None:
+    """A rename that doesn't fire (old column absent) adds no alias, so the column keeps its labels.
+
+    Mirrors R's #52 regression: a rule's year list can include a year in which
+    the column already carries the new name.
+    """
+    lf = pl.LazyFrame({"year": [2099, 2099], "family": [1, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["family"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {"family_r": {"years": ["2099"], "new_name": "family"}},
+                "merge_columns": {},
+            },
+        }
+    )
+    define_lf = make_define_lf([("family", "1", "Two parents"), ("family", "2", "One parent")])
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"family": ["Two parents", "One parent"]},
+        schema={"family": pl.Enum(["Two parents", "One parent"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_merge_is_not_aliased_through_a_rename_that_did_not_fire() -> None:
+    """A merge on a natively named column is labeled from that name, not a rename's old name."""
+    lf = pl.LazyFrame({"year": [2099, 2099], "hoursleep": [1, None], "hoursleep05": [None, 2]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["sleep"],
+            "transformations": {
+                "transform": {},
+                "rename_columns": {"hrs": {"years": ["2099"], "new_name": "hoursleep"}},
+                "merge_columns": {
+                    "sleep": {
+                        "years": ["2099"],
+                        "column_preferred": "hoursleep",
+                        "column_fallback": "hoursleep05",
+                    }
+                },
+            },
+        }
+    )
+    define_lf = make_define_lf(
+        [("hoursleep", "1", "Less than 6 hours"), ("hoursleep", "2", "6 hours")]
+    )
+
+    result = harmonize_year(lf, config, 2099, define_lf).collect()
+
+    expected = pl.DataFrame(
+        {"sleep": ["Less than 6 hours", "6 hours"]},
+        schema={"sleep": pl.Enum(["Less than 6 hours", "6 hours"])},
     )
     assert_frame_equal(result, expected)
