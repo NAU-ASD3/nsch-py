@@ -8,9 +8,17 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.9.14.3 (PR#81)
+## 2026.10.12 (PR#81)
 
 - Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
+
+## 2026.10.7 (PR#86)
+
+- Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
+## 2026.10.4 (PR#78)
+
+- Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
+- `apply_do_labels` now adds the leading dot at the point of use to match `parse_do`'s dotted output; a seam test runs a real `.do` file through both to keep the two in agreement
 
 ## 2026.9.14.2 (PR#77)
 
