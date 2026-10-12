@@ -8,7 +8,7 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.12 (PR#90)
+## 2026.10.12.2 (PR#90)
 
 - Added `check_config_do` to validate desired configuration variables against a year's DoSpec.
 - Accounted for year specific rename and merge rules to avoid incorrectly reporting harmonized variables as missing.
