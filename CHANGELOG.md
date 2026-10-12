@@ -13,6 +13,13 @@ so each version stays unique and the date stays honest.
 - Added `check_config_do` to validate desired configuration variables against a year's DoSpec.
 - Accounted for year specific rename and merge rules to avoid incorrectly reporting harmonized variables as missing.
 - Added regression tests and documentation, including a doctest example.
+## 2026.10.12.1 (PR#92)
+
+- Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean
+
+## 2026.10.12 (PR#81)
+
+- Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
 
 ## 2026.10.7 (PR#86)
 
