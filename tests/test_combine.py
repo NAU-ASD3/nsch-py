@@ -159,6 +159,32 @@ def test_provided_alias_map_is_used() -> None:
     assert_frame_equal(result, expected)
 
 
+def test_alias_year_list_overshoot_falls_back_to_native_name() -> None:
+    """Mirrors R's #52 test: an alias whose target has no define entries uses the column's own."""
+    lf = pl.LazyFrame({"eyedoctor": [1, 2, 1]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["eyedoctor"] * 4,
+            "value": ["1", "2", ".m", ".n"],
+            "desc": ["Yes", "No", "No valid response", "Not in universe"],
+        }
+    )
+    result = apply_do_labels(lf, define_lf, alias={"eyedoctor": "k4q31_r"})
+    expected = pl.LazyFrame(
+        {"eyedoctor": ["Yes", "No", "Yes"]}, schema={"eyedoctor": pl.Enum(["Yes", "No"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_alias_and_column_both_without_define_entries_stay_numeric() -> None:
+    """Mirrors R's #52 test: the guard doesn't rescue a column with no define entries of its own."""
+    lf = pl.LazyFrame({"mystery": [1.0, 2.0, 997.0]})
+    define_lf = pl.LazyFrame({"variable": ["sc_sex"], "value": ["1"], "desc": ["Male"]})
+    result = apply_do_labels(lf, define_lf, alias={"mystery": "also_absent"})
+    expected = pl.LazyFrame({"mystery": [1.0, 2.0, None]})
+    assert_frame_equal(result, expected)
+
+
 def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
     # a frame with two transformed columns, each with its own _label overrides with a
     # different number of distinct override values (Non-None length differs)

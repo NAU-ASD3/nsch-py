@@ -8,9 +8,27 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.7.1 (PR#89)
+## 2026.10.13.2 (PR#89)
 
 - Added `combine_years` to stack harmonized per-year frames into one collected `DataFrame`, widening `Enum` columns to the union of their per-year categories and filling columns absent from a year with null
+
+## 2026.10.13.1 (PR#88)
+
+- Added `harmonize_year`, wiring transform, rename, merge, subset, and labeling for one survey year with an alias map so renamed and merged columns are labeled from their original `.do` entries
+- The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
+- `harmonize_year`'s alias map only includes rename and merge rules that fire on the frame, so a rule whose year list includes a year where the column already has its new name leaves that column labeled under its own name (R reaches the same labels through a fallback in its `apply_do_labels`, R #52). A merge whose preferred source was renamed that year is labeled from the pre-rename `.do` name, where R leaves it unlabeled
+
+## 2026.10.13 (PR#96)
+
+- `apply_do_labels` falls back to a column's own define entries when its alias points at a name with none that year (alias year-list overshoot), matching R's fix in NAU-ASD3/nsch#63
+
+## 2026.10.12.1 (PR#92)
+
+- Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean
+
+## 2026.10.12 (PR#81)
+
+- Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
 
 ## 2026.10.7 (PR#86)
 
