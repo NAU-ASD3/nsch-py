@@ -14,9 +14,18 @@ so each version stays unique and the date stays honest.
 - The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
 - `harmonize_year`'s alias map only includes rename and merge rules that fire on the frame, so a rule whose year list includes a year where the column already has its new name leaves that column labeled under its own name (R reaches the same labels through a fallback in its `apply_do_labels`, R #52). A merge whose preferred source was renamed that year is labeled from the pre-rename `.do` name, where R leaves it unlabeled
 
+## 2026.10.12.1 (PR#92)
+
+- Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean
+
+## 2026.10.12 (PR#81)
+
+- Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
+
 ## 2026.10.7 (PR#86)
 
 - Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
+
 ## 2026.10.4 (PR#78)
 
 - Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
