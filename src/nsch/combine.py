@@ -6,7 +6,10 @@ import polars as pl
 
 from nsch._types import STATA_TAG_TO_SENTINEL, TaggedNA
 
-__all__ = ["apply_do_labels"]
+__all__ = [
+    "apply_do_labels",
+    "combine_years",
+]
 
 
 def _scan_override_labels(
@@ -81,7 +84,10 @@ def apply_do_labels(
         to handle columns whose names changed via ``rename_vars`` or ``merge_vars``
         from ``nsch.harmonize``. For example, {"family" : "family_r"} tells this
         function to label the ``family`` column using ``family_r``'s
-        define entries. Default is ``None``.
+        define entries. If the aliased name has no define entries but the
+        column's own name does, the column's own entries are used: the rename
+        didn't fire that year because the column already had its new name
+        (a rule's year list overshooting, R #52). Default is ``None``.
 
     Returns
     -------
@@ -148,6 +154,8 @@ def apply_do_labels(
     }
 
     lf_var_set = set(lf_vars)
+    # Every variable with any define entry, missing-value codes included, as R's defined.vars
+    defined_vars = set(define_df["variable"].to_list())
 
     # Map column name and label to lookup_name if lookup_name exists and has real values
     # combines the defined_vars + value_maps checks
@@ -159,6 +167,11 @@ def apply_do_labels(
             continue
         # If col is found in alias, return its value. Otherwise return the original column name
         lookup_name = alias.get(col, col)
+        # Guard against alias year-list overshoot (R #52): an alias pointing at a name with no
+        # define entries this year, on a column whose own name has them, means the rename did not
+        # fire and the column is natively named, so its own entries are the right source
+        if lookup_name not in defined_vars and col in defined_vars:
+            lookup_name = col
         mapping = value_maps.get(lookup_name)
 
         if mapping:
@@ -225,3 +238,113 @@ def apply_do_labels(
         lf = lf.drop(label_cols_to_drop)
 
     return lf
+
+
+def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
+    """Stack harmonized per-year frames into one combined dataset.
+
+    Concatenates the per-year ``LazyFrame``s produced by ``harmonize_year``
+    into a single collected ``DataFrame``. Columns present in some years but
+    not others are filled with null, as in R's ``rbindlist(fill = TRUE)``.
+    Every frame must carry a ``year`` column, and no year may appear in more
+    than one frame. Mirrors R's ``combine_years``.
+
+    This is the pipeline's single ``collect()``: everything upstream stays
+    lazy, and the whole multi-year plan is optimized and executed here.
+
+    Parameters
+    ----------
+    year_list : list[pl.LazyFrame]
+        One harmonized ``LazyFrame`` per survey year, each with a ``year``
+        column.
+
+    Returns
+    -------
+    pl.DataFrame
+        All rows from all years, in list order, with ``Enum`` columns widened
+        to the union of their per-year categories.
+
+    Raises
+    ------
+    ValueError
+        If ``year_list`` is empty, a frame lacks a ``year`` column, a column
+        is an ``Enum`` in some years but another dtype in others, or the
+        same year value appears in more than one frame.
+
+    Examples
+    --------
+    >>> import polars as pl
+    >>> y16 = pl.LazyFrame({"year": [2016, 2016], "x": [1, 2], "old": ["a", "b"]})
+    >>> y17 = pl.LazyFrame({"year": [2017, 2017], "x": [3, 4]})
+    >>> combine_years([y16, y17])
+    shape: (4, 3)
+    ┌──────┬─────┬──────┐
+    │ year ┆ x   ┆ old  │
+    │ ---  ┆ --- ┆ ---  │
+    │ i64  ┆ i64 ┆ str  │
+    ╞══════╪═════╪══════╡
+    │ 2016 ┆ 1   ┆ a    │
+    │ 2016 ┆ 2   ┆ b    │
+    │ 2017 ┆ 3   ┆ null │
+    │ 2017 ┆ 4   ┆ null │
+    └──────┴─────┴──────┘
+    """
+    if len(year_list) == 0:
+        raise ValueError("year_list must be a non-empty list of LazyFrames")
+    schemas = [lf.collect_schema() for lf in year_list]
+    for i, schema in enumerate(schemas):
+        if "year" not in schema.names():
+            raise ValueError(f"element {i} of year_list does not contain a 'year' column")
+
+    # Polars refuses to concatenate Enum columns whose category lists differ,
+    # and they legitimately differ by year (2024 added an urgent-care answer).
+    # Union each Enum column's categories across years, in order of first
+    # appearance, the way R's rbindlist unions factor levels.
+    categories: dict[str, list[str]] = {}
+    for schema in schemas:
+        for name, dtype in schema.items():
+            if isinstance(dtype, pl.Enum):
+                seen = categories.setdefault(name, [])
+                seen.extend(cat for cat in dtype.categories.to_list() if cat not in seen)
+
+    # The cast below would fail with a generic Polars error that names neither
+    # the column nor the years, so check up front. An all-null column (dtype
+    # Null) casts to Enum fine.
+    for name in categories:
+        other = [
+            (i, schema[name])
+            for i, schema in enumerate(schemas)
+            if name in schema.names()
+            and not isinstance(schema[name], pl.Enum)
+            and schema[name] != pl.Null
+        ]
+        if other:
+            where = ", ".join(
+                f"{year_list[i].select(pl.first('year')).collect().item()} ({other_dtype})"
+                for i, other_dtype in other
+            )
+            raise ValueError(f"column '{name}' is an Enum in some years but not in others: {where}")
+
+    # Tag each frame with its list position so the duplicate-year check can
+    # run inside the single collect instead of as a second query.
+    aligned = [
+        lf.with_columns(
+            pl.col(name).cast(pl.Enum(cats))
+            for name, cats in categories.items()
+            if name in schema.names()
+        ).with_columns(pl.lit(i).alias("__source"))
+        for i, (lf, schema) in enumerate(zip(year_list, schemas, strict=True))
+    ]
+    combined = pl.concat(aligned, how="diagonal").collect()
+
+    duplicated = (
+        combined.group_by("year")
+        .agg(pl.col("__source").n_unique().alias("n_frames"))
+        .filter(pl.col("n_frames") > 1)["year"]
+        .sort()
+        .to_list()
+    )
+    if duplicated:
+        years = ", ".join(str(year) for year in duplicated)
+        raise ValueError(f"duplicate year values across tables: {years}")
+    return combined.drop("__source")

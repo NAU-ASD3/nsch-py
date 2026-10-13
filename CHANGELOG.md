@@ -8,9 +8,23 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.13 (PR#99)
+## 2026.10.13.3 (PR#99)
 
 - Added `impute_a1_grade_2016` to a new `impute` module to redistribute coarse grade levels accross the finer categories used in 2017 onwards.
+
+## 2026.10.13.2 (PR#89)
+
+- Added `combine_years` to stack harmonized per-year frames into one collected `DataFrame`, widening `Enum` columns to the union of their per-year categories and filling columns absent from a year with null
+
+## 2026.10.13.1 (PR#88)
+
+- Added `harmonize_year`, wiring transform, rename, merge, subset, and labeling for one survey year with an alias map so renamed and merged columns are labeled from their original `.do` entries
+- The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
+- `harmonize_year`'s alias map only includes rename and merge rules that fire on the frame, so a rule whose year list includes a year where the column already has its new name leaves that column labeled under its own name (R reaches the same labels through a fallback in its `apply_do_labels`, R #52). A merge whose preferred source was renamed that year is labeled from the pre-rename `.do` name, where R leaves it unlabeled
+
+## 2026.10.13 (PR#96)
+
+- `apply_do_labels` falls back to a column's own define entries when its alias points at a name with none that year (alias year-list overshoot), matching R's fix in NAU-ASD3/nsch#63
 
 ## 2026.10.12.1 (PR#92)
 
@@ -23,7 +37,6 @@ so each version stays unique and the date stays honest.
 ## 2026.10.7 (PR#86)
 
 - Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
-
 ## 2026.10.4 (PR#78)
 
 - Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
