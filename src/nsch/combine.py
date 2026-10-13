@@ -81,7 +81,10 @@ def apply_do_labels(
         to handle columns whose names changed via ``rename_vars`` or ``merge_vars``
         from ``nsch.harmonize``. For example, {"family" : "family_r"} tells this
         function to label the ``family`` column using ``family_r``'s
-        define entries. Default is ``None``.
+        define entries. If the aliased name has no define entries but the
+        column's own name does, the column's own entries are used: the rename
+        didn't fire that year because the column already had its new name
+        (a rule's year list overshooting, R #52). Default is ``None``.
 
     Returns
     -------
@@ -148,6 +151,8 @@ def apply_do_labels(
     }
 
     lf_var_set = set(lf_vars)
+    # Every variable with any define entry, missing-value codes included, as R's defined.vars
+    defined_vars = set(define_df["variable"].to_list())
 
     # Map column name and label to lookup_name if lookup_name exists and has real values
     # combines the defined_vars + value_maps checks
@@ -159,6 +164,11 @@ def apply_do_labels(
             continue
         # If col is found in alias, return its value. Otherwise return the original column name
         lookup_name = alias.get(col, col)
+        # Guard against alias year-list overshoot (R #52): an alias pointing at a name with no
+        # define entries this year, on a column whose own name has them, means the rename did not
+        # fire and the column is natively named, so its own entries are the right source
+        if lookup_name not in defined_vars and col in defined_vars:
+            lookup_name = col
         mapping = value_maps.get(lookup_name)
 
         if mapping:
