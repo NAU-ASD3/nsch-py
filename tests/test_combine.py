@@ -288,8 +288,10 @@ def test_enum_categories_are_unioned_across_years() -> None:
     y16 = pl.LazyFrame({"year": [2016, 2016], "place": ["Clinic", "Office"]}).with_columns(
         pl.col("place").cast(pl.Enum(["Clinic", "Office"]))
     )
+    # 2024's categories are a subset of the union and out of order, so this fails if the
+    # function keeps the last frame's categories, sorts them, or remaps by position.
     y24 = pl.LazyFrame({"year": [2024, 2024], "place": ["Office", "Urgent Care"]}).with_columns(
-        pl.col("place").cast(pl.Enum(["Clinic", "Office", "Urgent Care"]))
+        pl.col("place").cast(pl.Enum(["Urgent Care", "Office"]))
     )
 
     result = combine_years([y16, y24])
@@ -297,6 +299,33 @@ def test_enum_categories_are_unioned_across_years() -> None:
     expected = pl.DataFrame(
         {"year": [2016, 2016, 2024, 2024], "place": ["Clinic", "Office", "Office", "Urgent Care"]},
         schema={"year": pl.Int64, "place": pl.Enum(["Clinic", "Office", "Urgent Care"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_error_names_column_and_year_when_a_column_is_enum_in_only_some_years() -> None:
+    """An Enum column that is numeric in another year is an error naming both."""
+    y16 = pl.LazyFrame({"year": [2016], "place": ["Clinic"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic"]))
+    )
+    y17 = pl.LazyFrame({"year": [2017], "place": [3]})
+
+    with pytest.raises(ValueError, match=r"'place' .* 2017 \(Int64\)"):
+        combine_years([y16, y17])
+
+
+def test_all_null_column_combines_with_an_enum_column() -> None:
+    """A column that is entirely null in one year (dtype Null) widens to the Enum."""
+    y16 = pl.LazyFrame({"year": [2016], "place": ["Clinic"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic"]))
+    )
+    y17 = pl.LazyFrame({"year": [2017], "place": [None]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2017], "place": ["Clinic", None]},
+        schema={"year": pl.Int64, "place": pl.Enum(["Clinic"])},
     )
     assert_frame_equal(result, expected)
 
