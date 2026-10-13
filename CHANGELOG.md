@@ -12,6 +12,18 @@ so each version stays unique and the date stays honest.
 
 - Added `impute_a1_grade_2016` to a new `impute` module to redistribute coarse grade levels accross the finer categories used in 2017 onwards.
 
+## 2026.10.12.1 (PR#92)
+
+- Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean
+
+## 2026.10.12 (PR#81)
+
+- Explained the deliberate 998 (logical-skip) recodes in the new-year runbook and cross-referenced them from the sentinel-collision section
+
+## 2026.10.7 (PR#86)
+
+- Added Pydantic models and `read_config` for loading and validating the NSCH configuration, including the bundled `variable-config.json`.
+
 ## 2026.10.4 (PR#78)
 
 - Moved the tagged-NA letter map to `_types.STATA_TAG_TO_SENTINEL` with bare letters as the canonical keys (matching pyreadstat and R) and pointed `readers.py` at it, closing #71
