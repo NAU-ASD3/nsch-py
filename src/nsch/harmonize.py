@@ -451,9 +451,15 @@ def impute_a1_grade_2016(
     seed : int
         Integer seed used to set seed value before sampling to impute. Default ``1``.
 
-    Returns:
-    --------
+    Returns
+    -------
         A pl.DataFrame of all years combined and values imputed.
+
+    Raises
+    ------
+    ValueError
+        If a1_grade_i contains values outside the coarse values
+        {1, 2, 3} for imputed rows
     """
     # Make sure combined_df contains a `year` and an `hhid` column
     col_names = combined_df.columns
@@ -496,7 +502,7 @@ def impute_a1_grade_2016(
     )
     # Make if no rows for imputation found, return the input dataframe
     # without making changes
-    if indexed_df.height == 0:
+    if rows_2016.height == 0:
         return combined_df
 
     # Mapping from coarse a1_grade_i categories (1, 2, 3) to the fine
@@ -587,6 +593,7 @@ def impute_a1_grade_2016(
             .alias("counts")
         )
     )
+
     # group -> (fine levels, weights) in a1_groups order
     group_weights = {
         group: (level, weight)
@@ -603,11 +610,12 @@ def impute_a1_grade_2016(
         index = [i for i, coarse_vals in enumerate(coarse) if coarse_vals == group]
         if index:
             draws = rand_gen.choices(levels, weights=weight, k=len(index))
-            for (
-                i,
-                d,
-            ) in zip(index, draws, strict=False):
+            for i, d in zip(index, draws, strict=False):
                 new_a1[i] = d
+
+    # Raise if a1 values are outside imputation range
+    if any(v is None for v in new_a1):
+        raise ValueError("a1_grade_i contains values outside {1, 2, 3} for imputed rows")
 
     # update row by row, preserving each column's existing enum (R factor) datatype and levels
     updated_df = pl.DataFrame(
