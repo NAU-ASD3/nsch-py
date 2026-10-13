@@ -1,6 +1,8 @@
-"""Generates a set of tiny synthetic .dta files for testing readers.py.
+"""Generates a set of tiny synthetic .dta files for testing readers.py and harmonize.py.
 This script is the source of truth for .dta files used in testing.
 """
+
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -79,6 +81,34 @@ def create_no_stratum_data() -> None:
     )
 
 
+# create a synthetic 2016 .dta with hhid, a1_grade_if, a1_grade_i to test impute_a1_grade_2016()
+def create_2016_dta(n: int = 10, filename: Path = "2016_impute_test") -> None:
+    df = pl.DataFrame(
+        {
+            "year": [2016] * n,
+            "hhid": list(range(1, n + 1)),
+            "a1_grade_if": [True] * n,
+            "a1_grade_i": np.random.choice([1, 2, 3], size=n, replace=True),
+        },
+        strict=False,
+    )
+
+    # Add non-impute flags, original dataframe gives true to all values
+    df = df.with_columns(
+        pl.when(pl.int_range(pl.len()) >= n - 5)
+        .then(False)
+        .otherwise(pl.col("a1_grade_if"))
+        .alias("a1_grade_if")
+    )
+
+    pyreadstat.write_dta(
+        df,
+        dst_path=Path("tests/data") / (filename + ".dta"),
+    )
+
+
 create_tagged_missing_dta()
 create_mixed_types_dta()
 create_no_stratum_data()
+create_2016_dta()
+create_2016_dta(n=100, filename="2016_large_impute_test")
