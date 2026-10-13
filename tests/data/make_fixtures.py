@@ -93,6 +93,14 @@ def create_2016_dta(n: int = 10, filename: Path = "2016_impute_test") -> None:
         strict=False,
     )
 
+    # Add non-impute flags, original dataframe gives true to all values
+    df = df.with_columns(
+        pl.when(pl.int_range(pl.len()) >= n - 5)
+        .then(False)
+        .otherwise(pl.col("a1_grade_if"))
+        .alias("a1_grade_if")
+    )
+
     pyreadstat.write_dta(
         df,
         dst_path=Path("tests/data") / (filename + ".dta"),
