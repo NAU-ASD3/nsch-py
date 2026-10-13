@@ -244,7 +244,7 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
 
     Parameters
     ----------
-    year_list
+    year_list : list[pl.LazyFrame]
         One harmonized ``LazyFrame`` per survey year, each with a ``year``
         column.
 
@@ -257,7 +257,8 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
     Raises
     ------
     ValueError
-        If ``year_list`` is empty, a frame lacks a ``year`` column, or the
+        If ``year_list`` is empty, a frame lacks a ``year`` column, a column
+        is an ``Enum`` in some years but another dtype in others, or the
         same year value appears in more than one frame.
 
     Examples
@@ -295,6 +296,24 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
             if isinstance(dtype, pl.Enum):
                 seen = categories.setdefault(name, [])
                 seen.extend(cat for cat in dtype.categories.to_list() if cat not in seen)
+
+    # The cast below would fail with a generic Polars error that names neither
+    # the column nor the years, so check up front. An all-null column (dtype
+    # Null) casts to Enum fine.
+    for name in categories:
+        other = [
+            (i, schema[name])
+            for i, schema in enumerate(schemas)
+            if name in schema.names()
+            and not isinstance(schema[name], pl.Enum)
+            and schema[name] != pl.Null
+        ]
+        if other:
+            where = ", ".join(
+                f"{year_list[i].select(pl.first('year')).collect().item()} ({other_dtype})"
+                for i, other_dtype in other
+            )
+            raise ValueError(f"column '{name}' is an Enum in some years but not in others: {where}")
 
     # Tag each frame with its list position so the duplicate-year check can
     # run inside the single collect instead of as a second query.
