@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.13 (PR#96)
+
+- `apply_do_labels` falls back to a column's own define entries when its alias points at a name with none that year (alias year-list overshoot), matching R's fix in NAU-ASD3/nsch#63
+
 ## 2026.10.12.1 (PR#92)
 
 - Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean
