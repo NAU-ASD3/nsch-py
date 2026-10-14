@@ -360,7 +360,11 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
         .with_columns(pl.lit(i).alias("__source"))
         for i, (lf, schema) in enumerate(zip(year_list, schemas, strict=True))
     ]
-    combined = pl.concat(aligned, how="diagonal").collect()
+    # Run on the in-memory engine, which was the default before Polars 2.0. The streaming engine
+    # (2.0's default) slows down sharply when many concatenated frames each carry many
+    # replace_strict calls, as apply_do_labels gives every year: about 4 minutes instead of 1
+    # second on the real 2016-2024 data.
+    combined = pl.concat(aligned, how="diagonal").collect(engine="in-memory")
 
     duplicated = (
         combined.group_by("year")
