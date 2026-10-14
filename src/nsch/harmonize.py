@@ -493,7 +493,10 @@ def harmonize_year(
     Warns
     -----
     UserWarning
-        From ``subset_vars`` for each desired variable missing from the frame.
+        For each desired variable missing from the frame. ``subset_vars``
+        raises these without knowing the year, so they are re-issued here
+        with the year in front (for example ``year 2016: Desired variable x
+        not found in lf``) and attributed to the caller.
 
     Notes
     -----
@@ -544,6 +547,14 @@ def harmonize_year(
     columns = lf.collect_schema().names()
     lf = rename_vars(lf, rules.rename_columns, year)
     lf = merge_vars(lf, rules.merge_columns, year)
-    lf = subset_vars(lf, config.desired_variables)
+    # subset_vars warns once per missing variable but doesn't know the year, which
+    # makes a nine-year run hard to read, so re-issue each warning with the year.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        lf = subset_vars(lf, config.desired_variables)
+    for caught_warning in caught:
+        warnings.warn(
+            f"year {year}: {caught_warning.message}", caught_warning.category, stacklevel=2
+        )
     alias = _build_alias_map(rules.rename_columns, rules.merge_columns, year, columns)
     return apply_do_labels(lf, define_lf, alias)

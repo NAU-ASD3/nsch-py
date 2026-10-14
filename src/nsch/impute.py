@@ -60,6 +60,13 @@ def impute_a1_grade_2016(
     ValueError
         If a1_grade_i contains values outside the coarse values
         {1, 2, 3} for imputed rows
+
+    Notes
+    -----
+    R leaves a flagged row with an unknown coarse code empty instead of
+    raising. Raising here is deliberate: in the real 2016 file all 1,524
+    flagged rows have a code of 1, 2 or 3, so an unknown code means the
+    input file is not what this function expects.
     """
     # Make sure combined_df contains a `year` and an `hhid` column
     col_names = combined_df.columns
@@ -71,13 +78,18 @@ def impute_a1_grade_2016(
     # Read Raw 2016 .dta to access the imputation flag (a1_grade_if)
     # and coarse imputed category (a1_grade_i) because these columns are
     # not carried through harmonization.
-    raw_2016, _ = pyreadstat.read_dta(str(dta_2016_path), user_missing=True, output_format="polars")
+    # Check the column names from the file's metadata first, then read only those three
+    # columns instead of the whole 2016 file.
     required_columns = ["hhid", "a1_grade_if", "a1_grade_i"]
-    if not set(required_columns).issubset(set(raw_2016.columns)):
+    _, meta = pyreadstat.read_dta(str(dta_2016_path), metadataonly=True, output_format="polars")
+    if not set(required_columns).issubset(set(meta.column_names)):
         raise ValueError("2016 .dta must contain hhid, a1_grade_if, and a1_grade_i columns")
+    raw_2016, _ = pyreadstat.read_dta(
+        str(dta_2016_path), usecols=required_columns, user_missing=True, output_format="polars"
+    )
 
-    # a1_grade_if: 0 = not imputed, 1 = imputed (tagged NAs become sentinels 996-999, so we match on
-    # == 1). Keep first occurrence per hhid, to mirror R's match().
+    # a1_grade_if is 1 for imputed rows. In the real 2016 file the other rows are missing
+    # rather than 0, so match on == 1. Keep first occurrence per hhid, to mirror R's match().
     imp_lookup = (
         raw_2016.select(required_columns)
         .filter(pl.col("a1_grade_if") == 1)  # Select imputed values only
