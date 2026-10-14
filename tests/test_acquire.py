@@ -10,7 +10,14 @@ import httpx
 import polars as pl
 import pytest
 
-from nsch.acquire import NSCH_DATA_URL, NSCH_URL_PREFIX, get_all_years, get_nsch_index, get_year
+from nsch.acquire import (
+    NSCH_DATA_URL,
+    NSCH_URL_PREFIX,
+    get_all_years,
+    get_clean_data,
+    get_nsch_index,
+    get_year,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -193,3 +200,8 @@ def test_get_all_years_raises_on_duplicate_year_files(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"2024"):
         get_all_years(data_path=tmp_path, download=False)
+
+
+def test_get_clean_data_raises_when_data_path_has_no_files(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"No \.dta files found"):
+        get_clean_data(data_path=tmp_path, download=False)

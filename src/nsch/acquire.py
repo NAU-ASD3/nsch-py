@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 
-__all__ = ["get_all_years", "get_nsch_index", "get_year"]
+__all__ = ["get_all_years", "get_clean_data", "get_nsch_index", "get_year"]
 
 NSCH_URL_PREFIX = "https://www.census.gov/programs-surveys/nsch/data/datasets."
 NSCH_DATA_URL = NSCH_URL_PREFIX + "html"
@@ -213,3 +213,76 @@ def get_all_years(
         raise ValueError(r"No matching .dta files found for the requested years")
 
     return joined_dta_do
+
+
+def get_clean_data(
+    config_path: Path | str | None = None,
+    data_path: Path = Path("NSCH_data/00_original_Stata"),
+    years: list[int] | None = None,
+    download: bool = False,
+    impute_2016: bool = True,
+    seed: int = 1,
+) -> pl.DataFrame:
+    """Load, harmonize, and combine NSCH survey data.
+
+    Parameters
+    ----------
+    config_path : Path | str | None
+        JSON configuration path. If None, use the bundled configuration.
+    data_path : Path
+        Directory containing the survey .dta and .do files.
+    years : list[int] | None
+        Survey years to include. If None, include all discovered years.
+    download : bool
+        Download survey files before discovering them.
+    impute_2016 : bool
+        Apply the 2016 adult education imputation when 2016 is present.
+    seed : int
+        Random seed for the 2016 imputation. Defaults to 1.
+
+    Returns
+    -------
+    pl.DataFrame
+        Combined, harmonized survey data, optionally imputed for 2016.
+
+    Notes
+    -----
+    Mirrors R's get_clean_data. Per-year processing remains lazy until
+    combine_years collects the combined result.
+    """
+
+    from nsch.config import read_config
+    from nsch.readers import parse_do, read_nsch_dta
+
+    config = read_config(config_path)
+    files = get_all_years(
+        data_path=data_path,
+        years=years,
+        download=download,
+    )
+
+    from nsch.combine import combine_years
+    from nsch.harmonize import harmonize_year
+
+    year_frames: list[pl.LazyFrame] = []
+    for row in files.iter_rows(named=True):
+        year = row["year"]
+        print(f"Processing year {year}...")
+        data = read_nsch_dta(Path(row["dta_path"]))
+        do_spec = parse_do(Path(row["do_path"]))
+        harmonized = harmonize_year(data, config, year, do_spec.define)
+        year_frames.append(harmonized)
+
+    combined = combine_years(year_frames)
+
+    if impute_2016 and 2016 in combined["year"].to_list():
+        from nsch.harmonize import impute_a1_grade_2016
+
+        dta_2016_path = Path(files.filter(pl.col("year") == 2016)["dta_path"].item())
+        combined = impute_a1_grade_2016(
+            combined,
+            dta_2016_path,
+            seed=seed,
+        )
+
+    return combined
