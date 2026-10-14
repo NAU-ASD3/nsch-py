@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import polars as pl
 
 from nsch._types import STATA_TAG_TO_SENTINEL, TaggedNA
@@ -267,9 +269,18 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
     Raises
     ------
     ValueError
-        If ``year_list`` is empty, a frame lacks a ``year`` column, a column
-        is an ``Enum`` in some years but another dtype in others, or the
+        If ``year_list`` is empty, a frame lacks a ``year`` column, or the
         same year value appears in more than one frame.
+
+    Warns
+    -----
+    UserWarning
+        For each column that is an ``Enum`` in some years but another dtype
+        in others, naming the column and those years. The column is combined
+        as text: labels in the labeled years, the values written out in the
+        rest. This matches R's ``rbindlist``, and it happens with the real
+        data: the 2016 .do file labels ``stratum`` ("Stratum 1"), and no later
+        year does.
 
     Examples
     --------
@@ -307,9 +318,11 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
                 seen = categories.setdefault(name, [])
                 seen.extend(cat for cat in dtype.categories.to_list() if cat not in seen)
 
-    # The cast below would fail with a generic Polars error that names neither
-    # the column nor the years, so check up front. An all-null column (dtype
-    # Null) casts to Enum fine.
+    # A column that is an Enum in some years and another dtype in others can't be
+    # cast to one Enum. R's rbindlist turns such a column into text, so do the same,
+    # and say so, since it usually means a .do file labels a variable in only some
+    # years. An all-null column (dtype Null) casts to Enum fine, so it doesn't count.
+    as_text: list[str] = []
     for name in categories:
         other = [
             (i, schema[name])
@@ -323,7 +336,15 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
                 f"{year_list[i].select(pl.first('year')).collect().item()} ({other_dtype})"
                 for i, other_dtype in other
             )
-            raise ValueError(f"column '{name}' is an Enum in some years but not in others: {where}")
+            warnings.warn(
+                f"column '{name}' is an Enum in some years but not in others ({where}); "
+                "combining it as text, as R's rbindlist does",
+                UserWarning,
+                stacklevel=2,
+            )
+            as_text.append(name)
+    for name in as_text:
+        del categories[name]
 
     # Tag each frame with its list position so the duplicate-year check can
     # run inside the single collect instead of as a second query.
@@ -332,7 +353,9 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
             pl.col(name).cast(pl.Enum(cats))
             for name, cats in categories.items()
             if name in schema.names()
-        ).with_columns(pl.lit(i).alias("__source"))
+        )
+        .with_columns(pl.col(name).cast(pl.String) for name in as_text if name in schema.names())
+        .with_columns(pl.lit(i).alias("__source"))
         for i, (lf, schema) in enumerate(zip(year_list, schemas, strict=True))
     ]
     combined = pl.concat(aligned, how="diagonal").collect()
