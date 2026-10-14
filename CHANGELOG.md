@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.14 (PR#101)
+
+- `read_nsch_dta` maps Stata byte columns to `Int16` instead of `Int8`, so tagged missing values keep their 996-999 sentinels instead of silently becoming null
+- `combine_years` combines a column that is labeled in only some years as text with a warning, as R's `rbindlist` does, instead of raising
+
 ## 2026.10.13.3 (PR#99)
 
 - Added `impute_a1_grade_2016` to a new `impute` module to redistribute coarse grade levels accross the finer categories used in 2017 onwards.
