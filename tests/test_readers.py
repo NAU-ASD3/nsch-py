@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from nsch.readers import parse_do, read_nsch_dta
+from nsch.readers import _rewrite_tagged_na, parse_do, read_nsch_dta
 
 
 def test_parse_do_raises_error_for_missing_file(tmp_path: Path) -> None:
@@ -204,3 +205,22 @@ def test_all_stata_types_remap_to_polars() -> None:
 def test_raises_error_if_stratum_col_missing() -> None:
     with pytest.raises(ValueError, match="No stratum"):
         read_nsch_dta(dta_no_stratum).collect()
+
+
+def test_byte_columns_keep_their_tagged_missing_sentinels() -> None:
+    """A Stata byte (int8) column with tagged missings keeps 996-999 instead of nulls.
+
+    The real NSCH files store most categorical answers as bytes. Casting those to
+    Int8 nulled the sentinels without an error, which dropped the missingness types
+    and broke every transform rule that recodes 998.
+    """
+    lf = pl.LazyFrame({"x": ["1", "2", "l", "m", "n", "d"]})
+    meta = SimpleNamespace(
+        readstat_variable_types={"x": "int8"},
+        missing_user_values={"x": ["l", "m", "n", "d"]},
+    )
+
+    result = _rewrite_tagged_na(lf, meta).collect()
+
+    expected = pl.DataFrame({"x": [1, 2, 998, 996, 997, 999]}, schema={"x": pl.Int16})
+    assert_frame_equal(result, expected)
