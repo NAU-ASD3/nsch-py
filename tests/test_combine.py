@@ -329,15 +329,24 @@ def test_enum_categories_are_unioned_across_years() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_error_names_column_and_year_when_a_column_is_enum_in_only_some_years() -> None:
-    """An Enum column that is numeric in another year is an error naming both."""
-    y16 = pl.LazyFrame({"year": [2016], "place": ["Clinic"]}).with_columns(
-        pl.col("place").cast(pl.Enum(["Clinic"]))
-    )
-    y17 = pl.LazyFrame({"year": [2017], "place": [3]})
+def test_column_labeled_in_only_some_years_is_combined_as_text_with_a_warning() -> None:
+    """An Enum column that is numeric in another year becomes text, as in R, with a warning.
 
-    with pytest.raises(ValueError, match=r"'place' .* 2017 \(Int64\)"):
-        combine_years([y16, y17])
+    The real data does this: the 2016 .do file labels stratum and no later year does.
+    """
+    y16 = pl.LazyFrame({"year": [2016, 2016], "stratum": ["Stratum 1", "Stratum 2"]}).with_columns(
+        pl.col("stratum").cast(pl.Enum(["Stratum 1", "Stratum 2"]))
+    )
+    y17 = pl.LazyFrame({"year": [2017, 2017], "stratum": [1, 2]})
+
+    with pytest.warns(UserWarning, match=r"'stratum' .*\(2017 \(Int64\)\)") as record:
+        result = combine_years([y16, y17])
+
+    assert record[0].filename == __file__
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "stratum": ["Stratum 1", "Stratum 2", "1", "2"]}
+    )
+    assert_frame_equal(result, expected)
 
 
 def test_all_null_column_combines_with_an_enum_column() -> None:
