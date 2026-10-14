@@ -1,0 +1,3 @@
+# `nsch.acquire`
+
+::: nsch.acquire
