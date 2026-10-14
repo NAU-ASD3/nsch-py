@@ -51,6 +51,9 @@ A1_GRADE_GROUP = {
     "High School Graduate or GED Completed": "2",
     "Completed a vocational, trade, or business school program": "2",
     "Some College Credit, but No Degree": "3",
+    # The .do files spell it "no Degree" in every year, while the imputation code in
+    # both packages says "No Degree". Both spellings are group 3.
+    "Some College Credit, but no Degree": "3",
     "Associate Degree (AA, AS)": "3",
     "Bachelor's Degree (BA, BS, AB)": "3",
     "Master's Degree (MA, MS, MSW, MBA)": "3",
