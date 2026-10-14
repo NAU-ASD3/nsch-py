@@ -1,6 +1,6 @@
 [project]
 name = "nsch"
-version = "2026.10.14"
+version = "2026.10.14.1"
 description = "NSCH data preparation toolkit: download, harmonize, and combine National Survey of Children's Health data across years."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "polars>=1.43.2,<2",
+    "polars>=1.43.2,<3",
     "pyreadstat>=1.3.6",
     "pydantic>=2.6,<3",
     "httpx>=0.27",

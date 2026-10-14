@@ -222,10 +222,12 @@ def apply_do_labels(
 
         exprs.append(factor_expr.cast(pl.Enum(categories)).alias(col))
 
-    # Null out sentinel codes for columns that are entirely missing
+    # Null out sentinel codes for columns that are entirely missing. The codes are cast to the
+    # column's own dtype first: Polars 2.0 won't compare a Float column against integers in is_in.
     for col in plain_numeric_cols:
+        codes = pl.Series(sentinel_codes, dtype=schema[col])
         exprs.append(
-            pl.when(pl.col(col).is_in(sentinel_codes))
+            pl.when(pl.col(col).is_in(codes.implode()))
             .then(None)
             .otherwise(pl.col(col))
             .cast(schema[col])
@@ -358,7 +360,11 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
         .with_columns(pl.lit(i).alias("__source"))
         for i, (lf, schema) in enumerate(zip(year_list, schemas, strict=True))
     ]
-    combined = pl.concat(aligned, how="diagonal").collect()
+    # Run on the in-memory engine, which was the default before Polars 2.0. The streaming engine
+    # (2.0's default) slows down sharply when many concatenated frames each carry many
+    # replace_strict calls, as apply_do_labels gives every year: about 4 minutes instead of 1
+    # second on the real 2016-2024 data.
+    combined = pl.concat(aligned, how="diagonal").collect(engine="in-memory")
 
     duplicated = (
         combined.group_by("year")
