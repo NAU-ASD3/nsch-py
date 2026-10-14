@@ -440,5 +440,5 @@ are the entire pattern in the package.
 - The [Onboarding](onboarding.md) guide and the
   [Development walkthrough](development-walkthrough.md) for how the work
   actually gets done day to day.
-- Function-level API reference, which will be generated under `api/` as
-  the functions land.
+- The [API reference](api/harmonize.md), generated from the docstrings
+  under `api/`.

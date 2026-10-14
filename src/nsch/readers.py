@@ -159,8 +159,9 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
 
     Returns
     -------
-    A ``pl.LazyFrame`` of the STATA data with the missing values remapped to their sentinel
-    values as defined in the ``_types`` module.
+    pl.LazyFrame
+        The Stata data with tagged missing values remapped to the sentinel
+        values defined in the ``_types`` module.
     """
     schema = lf.collect_schema()
 
@@ -206,8 +207,9 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
 
     Returns
     -------
-    A ``pl.LazyFrame`` containing the ingested ``.dta`` file with tagged NAs remapped,
-    data types normalized, and the ``stratum`` string quirk handled.
+    pl.LazyFrame
+        The ``.dta`` file with tagged NAs remapped, data types normalized,
+        and the ``stratum`` string quirk handled.
 
     Examples
     --------

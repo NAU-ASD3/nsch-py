@@ -57,7 +57,7 @@ This package centralizes those rules in a single audited configuration and appli
 
 ## Documentation
 
-Full documentation is published at <https://nau-asd3.github.io/nsch-py/>: an onboarding guide, a development walkthrough, and the design decisions behind the package. A function-level API reference will be added as the package gains functions.
+Full documentation is published at <https://nau-asd3.github.io/nsch-py/>: an onboarding guide, a development walkthrough, the design decisions behind the package, and an [API reference](https://nau-asd3.github.io/nsch-py/api/harmonize/) for every public function.
 
 ## Contributing
 

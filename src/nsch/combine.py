@@ -93,8 +93,9 @@ def apply_do_labels(
 
     Returns
     -------
-    A pl.LazyFrame with categorical columns converted to factors and continuous
-    columns remaining numeric with sentinel codes replaced by ``None``.
+    pl.LazyFrame
+        Labeled columns converted to ``Enum``, and other numeric columns
+        left numeric, with sentinel codes replaced by ``None`` in both.
 
     Examples
     --------
