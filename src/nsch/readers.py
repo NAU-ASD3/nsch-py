@@ -131,12 +131,16 @@ def parse_do(year_do_path: str | Path) -> DoSpec:
     )
 
 
+# Stata "byte" columns (int8) are widened to Int16: the tagged-missing sentinels
+# 996-999 don't fit in an Int8, and a cast to Int8 turns them into nulls without
+# an error, losing the four missingness types. Int16 holds every NSCH code and
+# every sentinel.
 READSTAT_TO_POLARS = {
     "double": pl.Float64,
     "float": pl.Float32,
     "int32": pl.Int32,
     "int16": pl.Int16,
-    "int8": pl.Int8,
+    "int8": pl.Int16,
     "string": pl.Utf8,
 }
 
