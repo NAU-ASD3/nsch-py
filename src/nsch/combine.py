@@ -222,10 +222,12 @@ def apply_do_labels(
 
         exprs.append(factor_expr.cast(pl.Enum(categories)).alias(col))
 
-    # Null out sentinel codes for columns that are entirely missing
+    # Null out sentinel codes for columns that are entirely missing. The codes are cast to the
+    # column's own dtype first: Polars 2.0 won't compare a Float column against integers in is_in.
     for col in plain_numeric_cols:
+        codes = pl.Series(sentinel_codes, dtype=schema[col])
         exprs.append(
-            pl.when(pl.col(col).is_in(sentinel_codes))
+            pl.when(pl.col(col).is_in(codes.implode()))
             .then(None)
             .otherwise(pl.col(col))
             .cast(schema[col])
