@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.15 (PR#100)
+
+- `harmonize_year` re-issues `subset_vars`' missing-variable warnings with the year in front, attributed to the caller
+- `impute_a1_grade_2016` reads only `hhid`, `a1_grade_if` and `a1_grade_i` from the 2016 file, checking the names from its metadata first
+
 ## 2026.10.14.2 (PR#103)
 
 - Added an API reference to the docs site: one page per public module, generated from the docstrings

@@ -189,3 +189,15 @@ def test_a1_grade_imputation_raises_on_invalid_coarse_code(tmp_path: Path) -> No
     )
     with pytest.raises(ValueError, match="outside"):
         impute_a1_grade_2016(combine_df, bad_dta, seed=1)
+
+
+def test_a1_grade_imputation_raises_when_dta_lacks_required_columns(tmp_path: Path) -> None:
+    """A 2016 file without a1_grade_i raises a clear error before any data is read"""
+    combine_df = make_combined_test_dataframe(3, 40)
+    no_coarse_dta = tmp_path / "no_coarse_2016.dta"
+    pyreadstat.write_dta(
+        pl.DataFrame({"hhid": [1, 2, 3], "a1_grade_if": [1, 1, 1]}),
+        str(no_coarse_dta),
+    )
+    with pytest.raises(ValueError, match="must contain hhid, a1_grade_if, and a1_grade_i"):
+        impute_a1_grade_2016(combine_df, no_coarse_dta, seed=1)

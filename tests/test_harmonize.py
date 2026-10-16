@@ -701,3 +701,21 @@ def test_merge_is_not_aliased_through_a_rename_that_did_not_fire() -> None:
         schema={"sleep": pl.Enum(["Less than 6 hours", "6 hours"])},
     )
     assert_frame_equal(result, expected)
+
+
+def test_missing_desired_variable_warning_names_the_year_and_the_caller() -> None:
+    """harmonize_year re-issues subset_vars' warning with the year, pointing at its caller."""
+    lf = pl.LazyFrame({"year": [2099], "a": [1]})
+    config = Config.model_validate(
+        {
+            "desired_variables": ["a", "b"],
+            "transformations": {"transform": {}, "rename_columns": {}, "merge_columns": {}},
+        }
+    )
+    define_lf = make_define_lf([("a", "1", "One")])
+
+    with pytest.warns(UserWarning, match=r"^year 2099: Desired variable b not found") as record:
+        harmonize_year(lf, config, 2099, define_lf)
+
+    assert len(record) == 1
+    assert record[0].filename == __file__
