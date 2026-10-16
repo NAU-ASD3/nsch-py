@@ -1,3 +1,5 @@
+"""The one-off 2016 ``a1_grade`` imputation that runs after ``combine_years``."""
+
 from __future__ import annotations
 
 import random
@@ -53,7 +55,8 @@ def impute_a1_grade_2016(
 
     Returns
     -------
-        A pl.DataFrame of all years combined and values imputed.
+    pl.DataFrame
+        All years combined, with the flagged 2016 rows imputed.
 
     Raises
     ------

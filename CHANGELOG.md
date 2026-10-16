@@ -8,10 +8,26 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.14 (PR#100)
+## 2026.10.15 (PR#100)
 
 - `harmonize_year` re-issues `subset_vars`' missing-variable warnings with the year in front, attributed to the caller
 - `impute_a1_grade_2016` reads only `hhid`, `a1_grade_if` and `a1_grade_i` from the 2016 file, checking the names from its metadata first
+
+## 2026.10.14.2 (PR#103)
+
+- Added an API reference to the docs site: one page per public module, generated from the docstrings
+- Every docstring's Returns section now starts with a type line, so it renders correctly in the reference
+
+## 2026.10.14.1 (PR#102)
+
+- Supports polars 2.0: the dependency is now `polars>=1.43.2,<3`
+- `apply_do_labels` casts the 996-999 sentinel codes to each column's dtype before `is_in`, which polars 2.0 requires
+- `combine_years` collects on the in-memory engine; on polars 2.0's default streaming engine the full 2016-2024 run took minutes instead of seconds
+
+## 2026.10.14 (PR#101)
+
+- `read_nsch_dta` maps Stata byte columns to `Int16` instead of `Int8`, so tagged missing values keep their 996-999 sentinels instead of silently becoming null
+- `combine_years` combines a column that is labeled in only some years as text with a warning, as R's `rbindlist` does, instead of raising
 
 ## 2026.10.13.3 (PR#99)
 

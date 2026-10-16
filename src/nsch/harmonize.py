@@ -245,8 +245,9 @@ def subset_vars(lf: pl.LazyFrame, desired_variables: list[str]) -> pl.LazyFrame:
 
     Returns
     -------
-    a pl.LazyFrame containing only the variables selected using
-    ``desired_variables`` and their ``_label`` columns
+    pl.LazyFrame
+        Only the variables in ``desired_variables`` that are present, plus
+        their ``_label`` columns.
 
     Examples
     --------
@@ -296,16 +297,17 @@ def merge_vars(lf: pl.LazyFrame, merges: dict[str, MergeRule], year: int) -> pl.
     lf : pl.LazyFrame
         A polars LazyFrame with the columns to merge.
     merges : dict[str, MergeRule]
-        A named dictionary containing a Merge Rule and Year from the ``.json`` config file.
-        This structure defines the mapping between the preferred and fallback columns
-        for a given year.
+        The config's ``merge_columns`` rules, keyed by the merged column's
+        name. Each rule names the preferred and fallback columns and the
+        years it applies to.
     year : int
         The year of data on which to perform the merge.
 
     Returns
     -------
-    A pl.LazyFrame containing the merged column and its associated ``_label`` column, if present,
-    as well as any other untouched columns. The original preferred and fallback columns are removed.
+    pl.LazyFrame
+        The merged column and its ``_label`` column (if present), plus all
+        untouched columns. The preferred and fallback columns are removed.
 
     Examples
     --------
