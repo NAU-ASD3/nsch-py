@@ -7,7 +7,7 @@ https://nau-asd3.github.io/nsch-py/ for usage.
 
 from importlib.metadata import PackageNotFoundError, version
 
-from nsch.acquire import get_clean_data
+from nsch.pipeline import get_clean_data
 
 # The package version is sourced from the installed distribution metadata
 # (set by hatchling from pyproject.toml at build time). The try/except
