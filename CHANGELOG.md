@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.18.1 (PR#105)
+
+- Added the 2025 survey year: "2025" is appended to the 40 configuration rules that apply in 2024, matching the R package's copy of `variable-config.json` byte for byte
+
 ## 2026.10.18 (PR#100)
 
 - `harmonize_year` re-issues `subset_vars`' missing-variable warnings with the year in front, attributed to the caller
