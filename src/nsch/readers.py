@@ -131,12 +131,16 @@ def parse_do(year_do_path: str | Path) -> DoSpec:
     )
 
 
+# Stata "byte" columns (int8) are widened to Int16: the tagged-missing sentinels
+# 996-999 don't fit in an Int8, and a cast to Int8 turns them into nulls without
+# an error, losing the four missingness types. Int16 holds every NSCH code and
+# every sentinel.
 READSTAT_TO_POLARS = {
     "double": pl.Float64,
     "float": pl.Float32,
     "int32": pl.Int32,
     "int16": pl.Int16,
-    "int8": pl.Int8,
+    "int8": pl.Int16,
     "string": pl.Utf8,
 }
 
@@ -155,8 +159,9 @@ def _rewrite_tagged_na(lf: pl.LazyFrame, meta: pyreadstat.metadata_container) ->
 
     Returns
     -------
-    A ``pl.LazyFrame`` of the STATA data with the missing values remapped to their sentinel
-    values as defined in the ``_types`` module.
+    pl.LazyFrame
+        The Stata data with tagged missing values remapped to the sentinel
+        values defined in the ``_types`` module.
     """
     schema = lf.collect_schema()
 
@@ -202,8 +207,9 @@ def read_nsch_dta(path: Path) -> pl.LazyFrame:
 
     Returns
     -------
-    A ``pl.LazyFrame`` containing the ingested ``.dta`` file with tagged NAs remapped,
-    data types normalized, and the ``stratum`` string quirk handled.
+    pl.LazyFrame
+        The ``.dta`` file with tagged NAs remapped, data types normalized,
+        and the ``stratum`` string quirk handled.
 
     Examples
     --------

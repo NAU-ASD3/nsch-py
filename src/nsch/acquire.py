@@ -29,7 +29,8 @@ def get_nsch_index(local_html_path: Path | None = None) -> pl.DataFrame:
 
     Returns
     -------
-    A ``pl.DataFrame`` containing one row per year of data, and columns ``url``, ``year``.
+    pl.DataFrame
+        One row per year of data, with columns ``url`` and ``year``.
     """
     # If no file path is passed for caching, create a temp file
     if local_html_path is None:
@@ -89,7 +90,8 @@ def get_year(
 
     Returns
     -------
-    A ``Path`` to the resulting download
+    Path
+        The path to the resulting download.
     """
     # don't need to check if year_url is string, python will pass objects and mypy handles typing
     # same for data_path and verbose
@@ -158,8 +160,9 @@ def get_all_years(
 
     Returns
     -------
-    A ``pl.DataFrame`` with columns ``year`` (integer), ``dta_path`` (character),
-    and ``do_path``(character).
+    pl.DataFrame
+        Columns ``year`` (integer), ``dta_path`` (string) and ``do_path``
+        (string), one row per year.
     """
     if download:
         # Get list of files from index
@@ -273,7 +276,7 @@ def get_clean_data(
     combined = combine_years(year_frames)
 
     if impute_2016 and 2016 in combined["year"].to_list():
-        from nsch.harmonize import impute_a1_grade_2016
+        from nsch.impute import impute_a1_grade_2016
 
         dta_2016_path = Path(files.filter(pl.col("year") == 2016)["dta_path"].item())
         combined = impute_a1_grade_2016(

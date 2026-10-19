@@ -1,0 +1,3 @@
+# `nsch.validate`
+
+::: nsch.validate
