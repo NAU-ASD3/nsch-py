@@ -419,8 +419,8 @@ def test_merged_variable_not_reported_missing() -> None:
     do_spec = DoSpec(
         var=pl.DataFrame(
             {
-                "variable": ["hoursleep"],
-                "desc": ["Hours of sleep"],
+                "variable": ["hoursleep", "hoursleep05"],
+                "desc": ["Hours of sleep", "Hours of sleep (alternate)"],
             }
         ).lazy(),
         define=pl.DataFrame(
@@ -446,7 +446,7 @@ def test_merged_variable_not_reported_missing() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_merged_variable_with_fallback_not_reported_missing() -> None:
+def test_merge_with_only_one_source_is_reported_missing() -> None:
     config = Config(
         desired_variables=["sleep"],
         transformations=Transformations(
@@ -478,12 +478,54 @@ def test_merged_variable_with_fallback_not_reported_missing() -> None:
     result = check_config_do(config, do_spec, year=2024)
 
     expected = pl.DataFrame(
+        {
+            "variable": ["sleep"],
+            "year": [2024],
+            "source": ["desired_variables"],
+            "issue": ["missing_variable"],
+        },
         schema={
             "variable": pl.Utf8,
             "year": pl.Int64,
             "source": pl.Utf8,
             "issue": pl.Utf8,
         },
+    )
+
+    assert_frame_equal(result, expected)
+
+
+def test_two_renamed_variables_not_reported_missing() -> None:
+    config = Config(
+        desired_variables=["y", "b"],
+        transformations=Transformations(
+            rename_columns={
+                "x": RenameRule(years=["2024"], new_name="y"),
+                "a": RenameRule(years=["2024"], new_name="b"),
+            }
+        ),
+    )
+
+    do_spec = DoSpec(
+        var=pl.DataFrame({"variable": ["x", "a"]}).lazy(),
+        define=pl.DataFrame(
+            schema={
+                "variable": pl.Utf8,
+                "value": pl.Utf8,
+                "desc": pl.Utf8,
+            }
+        ).lazy(),
+    )
+
+    result = check_config_do(config, do_spec, year=2024)
+
+    expected = pl.DataFrame(
+        schema={
+            "variable": pl.Utf8,
+            "year": pl.Int64,
+            "source": pl.Utf8,
+            "issue": pl.Utf8,
+        }
     )
 
     assert_frame_equal(result, expected)
