@@ -8,11 +8,51 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.10.12.2 (PR#90)
+## 2026.10.19 (PR#90)
 
 - Added `check_config_do` to validate desired configuration variables against a year's DoSpec.
 - Accounted for year specific rename and merge rules to avoid incorrectly reporting harmonized variables as missing.
 - Added regression tests and documentation, including a doctest example.
+
+## 2026.10.18 (PR#100)
+
+- `harmonize_year` re-issues `subset_vars`' missing-variable warnings with the year in front, attributed to the caller
+- `impute_a1_grade_2016` reads only `hhid`, `a1_grade_if` and `a1_grade_i` from the 2016 file, checking the names from its metadata first
+
+## 2026.10.14.2 (PR#103)
+
+- Added an API reference to the docs site: one page per public module, generated from the docstrings
+- Every docstring's Returns section now starts with a type line, so it renders correctly in the reference
+
+## 2026.10.14.1 (PR#102)
+
+- Supports polars 2.0: the dependency is now `polars>=1.43.2,<3`
+- `apply_do_labels` casts the 996-999 sentinel codes to each column's dtype before `is_in`, which polars 2.0 requires
+- `combine_years` collects on the in-memory engine; on polars 2.0's default streaming engine the full 2016-2024 run took minutes instead of seconds
+
+## 2026.10.14 (PR#101)
+
+- `read_nsch_dta` maps Stata byte columns to `Int16` instead of `Int8`, so tagged missing values keep their 996-999 sentinels instead of silently becoming null
+- `combine_years` combines a column that is labeled in only some years as text with a warning, as R's `rbindlist` does, instead of raising
+
+## 2026.10.13.3 (PR#99)
+
+- Added `impute_a1_grade_2016` to a new `impute` module to redistribute coarse grade levels accross the finer categories used in 2017 onwards.
+
+## 2026.10.13.2 (PR#89)
+
+- Added `combine_years` to stack harmonized per-year frames into one collected `DataFrame`, widening `Enum` columns to the union of their per-year categories and filling columns absent from a year with null
+
+## 2026.10.13.1 (PR#88)
+
+- Added `harmonize_year`, wiring transform, rename, merge, subset, and labeling for one survey year with an alias map so renamed and merged columns are labeled from their original `.do` entries
+- The harmonize functions now take the config layer's Pydantic rule models (`RenameRule`, `MergeRule`, `TransformRule`) and `harmonize_year` takes a `Config`, replacing the duplicate TypedDicts
+- `harmonize_year`'s alias map only includes rename and merge rules that fire on the frame, so a rule whose year list includes a year where the column already has its new name leaves that column labeled under its own name (R reaches the same labels through a fallback in its `apply_do_labels`, R #52). A merge whose preferred source was renamed that year is labeled from the pre-rename `.do` name, where R leaves it unlabeled
+
+## 2026.10.13 (PR#96)
+
+- `apply_do_labels` falls back to a column's own define entries when its alias points at a name with none that year (alias year-list overshoot), matching R's fix in NAU-ASD3/nsch#63
+
 ## 2026.10.12.1 (PR#92)
 
 - Made `parse_do`'s docstring example self-contained (writes a small do-file to a temp directory) so every module's doctests run clean

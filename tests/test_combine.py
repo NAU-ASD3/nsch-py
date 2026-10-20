@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import polars as pl
+import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 
-from nsch.combine import apply_do_labels
+from nsch.combine import apply_do_labels, combine_years
 from nsch.readers import parse_do
 
 if TYPE_CHECKING:
@@ -158,6 +159,32 @@ def test_provided_alias_map_is_used() -> None:
     assert_frame_equal(result, expected)
 
 
+def test_alias_year_list_overshoot_falls_back_to_native_name() -> None:
+    """Mirrors R's #52 test: an alias whose target has no define entries uses the column's own."""
+    lf = pl.LazyFrame({"eyedoctor": [1, 2, 1]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["eyedoctor"] * 4,
+            "value": ["1", "2", ".m", ".n"],
+            "desc": ["Yes", "No", "No valid response", "Not in universe"],
+        }
+    )
+    result = apply_do_labels(lf, define_lf, alias={"eyedoctor": "k4q31_r"})
+    expected = pl.LazyFrame(
+        {"eyedoctor": ["Yes", "No", "Yes"]}, schema={"eyedoctor": pl.Enum(["Yes", "No"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_alias_and_column_both_without_define_entries_stay_numeric() -> None:
+    """Mirrors R's #52 test: the guard doesn't rescue a column with no define entries of its own."""
+    lf = pl.LazyFrame({"mystery": [1.0, 2.0, 997.0]})
+    define_lf = pl.LazyFrame({"variable": ["sc_sex"], "value": ["1"], "desc": ["Male"]})
+    result = apply_do_labels(lf, define_lf, alias={"mystery": "also_absent"})
+    expected = pl.LazyFrame({"mystery": [1.0, 2.0, None]})
+    assert_frame_equal(result, expected)
+
+
 def test_a_frame_with_multiple_label_overrides_of_different_lengths() -> None:
     # a frame with two transformed columns, each with its own _label overrides with a
     # different number of distinct override values (Non-None length differs)
@@ -253,3 +280,107 @@ def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -
         },
     )
     assert_frame_equal(result, expected)
+
+
+# Testing Functions for combine_years
+
+
+def test_combines_multiple_year_frames_in_order() -> None:
+    """Rows from each year stack in list order with every year present once."""
+    y16 = pl.LazyFrame({"year": [2016, 2016, 2016], "x": [1, 2, 3]})
+    y17 = pl.LazyFrame({"year": [2017, 2017, 2017], "x": [4, 5, 6]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame({"year": [2016] * 3 + [2017] * 3, "x": [1, 2, 3, 4, 5, 6]})
+    assert_frame_equal(result, expected)
+
+
+def test_columns_missing_from_some_years_are_filled_with_null() -> None:
+    """A column present in one year only is null for the other years."""
+    y16 = pl.LazyFrame({"year": [2016, 2016], "x": [1, 2], "var2": [10.0, 20.0]})
+    y17 = pl.LazyFrame({"year": [2017, 2017], "x": [3, 4]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "x": [1, 2, 3, 4], "var2": [10.0, 20.0, None, None]}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_enum_categories_are_unioned_across_years() -> None:
+    """Enum columns widen to the union of per-year categories, first appearance first."""
+    y16 = pl.LazyFrame({"year": [2016, 2016], "place": ["Clinic", "Office"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic", "Office"]))
+    )
+    # 2024's categories are a subset of the union and out of order, so this fails if the
+    # function keeps the last frame's categories, sorts them, or remaps by position.
+    y24 = pl.LazyFrame({"year": [2024, 2024], "place": ["Office", "Urgent Care"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Urgent Care", "Office"]))
+    )
+
+    result = combine_years([y16, y24])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2024, 2024], "place": ["Clinic", "Office", "Office", "Urgent Care"]},
+        schema={"year": pl.Int64, "place": pl.Enum(["Clinic", "Office", "Urgent Care"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_column_labeled_in_only_some_years_is_combined_as_text_with_a_warning() -> None:
+    """An Enum column that is numeric in another year becomes text, as in R, with a warning.
+
+    The real data does this: the 2016 .do file labels stratum and no later year does.
+    """
+    y16 = pl.LazyFrame({"year": [2016, 2016], "stratum": ["Stratum 1", "Stratum 2"]}).with_columns(
+        pl.col("stratum").cast(pl.Enum(["Stratum 1", "Stratum 2"]))
+    )
+    y17 = pl.LazyFrame({"year": [2017, 2017], "stratum": [1, 2]})
+
+    with pytest.warns(UserWarning, match=r"'stratum' .*\(2017 \(Int64\)\)") as record:
+        result = combine_years([y16, y17])
+
+    assert record[0].filename == __file__
+    expected = pl.DataFrame(
+        {"year": [2016, 2016, 2017, 2017], "stratum": ["Stratum 1", "Stratum 2", "1", "2"]}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_all_null_column_combines_with_an_enum_column() -> None:
+    """A column that is entirely null in one year (dtype Null) widens to the Enum."""
+    y16 = pl.LazyFrame({"year": [2016], "place": ["Clinic"]}).with_columns(
+        pl.col("place").cast(pl.Enum(["Clinic"]))
+    )
+    y17 = pl.LazyFrame({"year": [2017], "place": [None]})
+
+    result = combine_years([y16, y17])
+
+    expected = pl.DataFrame(
+        {"year": [2016, 2017], "place": ["Clinic", None]},
+        schema={"year": pl.Int64, "place": pl.Enum(["Clinic"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_error_for_duplicate_year_values_across_frames() -> None:
+    """The same year in two frames is an error naming the year."""
+    a = pl.LazyFrame({"year": [2016, 2016], "x": [1, 2]})
+    b = pl.LazyFrame({"year": [2016, 2016], "x": [3, 4]})
+
+    with pytest.raises(ValueError, match="duplicate year"):
+        combine_years([a, b])
+
+
+def test_error_for_missing_year_column() -> None:
+    """A frame without a year column is an error naming its position."""
+    with pytest.raises(ValueError, match=r"element 0 .* 'year'"):
+        combine_years([pl.LazyFrame({"x": [1, 2]})])
+
+
+def test_error_for_empty_list() -> None:
+    """An empty list is an error rather than an empty frame."""
+    with pytest.raises(ValueError, match="non-empty"):
+        combine_years([])
