@@ -1,0 +1,3 @@
+# `nsch.config`
+
+::: nsch.config
