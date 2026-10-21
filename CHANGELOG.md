@@ -8,6 +8,12 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.21 (PR#98)
+
+- Added `get_clean_data` as the public entry point for loading, harmonizing,
+  combining, and optionally imputing NSCH survey data.
+- Added progress logging and an end-to-end test using two synthetic survey years.
+
 ## 2026.10.18 (PR#100)
 
 - `harmonize_year` re-issues `subset_vars`' missing-variable warnings with the year in front, attributed to the caller
