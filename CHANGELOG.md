@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.21.2 (PR#97)
+
+- Added `tests/test_r_parity.py`, which checks `get_clean_data` against the R package's 2016-2024 output on the real files; it's skipped unless `NSCH_REAL_DATA_DIR` and `NSCH_R_REFERENCE` are set
+
 ## 2026.10.21.1 (PR#90)
 
 - Added `check_config_do` to validate desired configuration variables against a year's DoSpec.
