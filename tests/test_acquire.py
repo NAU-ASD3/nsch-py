@@ -10,7 +10,13 @@ import httpx
 import polars as pl
 import pytest
 
-from nsch.acquire import NSCH_DATA_URL, NSCH_URL_PREFIX, get_all_years, get_nsch_index, get_year
+from nsch.acquire import (
+    NSCH_DATA_URL,
+    NSCH_URL_PREFIX,
+    get_all_years,
+    get_nsch_index,
+    get_year,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -7,6 +7,8 @@ https://nau-asd3.github.io/nsch-py/ for usage.
 
 from importlib.metadata import PackageNotFoundError, version
 
+from nsch.pipeline import get_clean_data
+
 # The package version is sourced from the installed distribution metadata
 # (set by hatchling from pyproject.toml at build time). The try/except
 # handles the edge case of running directly from a source checkout that
@@ -17,4 +19,4 @@ try:
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "0.0.0+unknown"
 
-__all__ = ["__version__"]
+__all__ = ["__version__", "get_clean_data"]
