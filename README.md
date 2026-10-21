@@ -10,7 +10,7 @@ A Python toolkit for downloading, harmonizing, and combining National Survey of 
 
 ## Status
 
-Pre-1.0. APIs may change. The package is being developed under the NAU ASD3 Outcomes Project (NIH-funded). It is a Python reimplementation of the [R `nsch` package](https://github.com/NAU-ASD3/nsch); the R version remains the reference implementation until this package reproduces both the 2016–2023 and 2016–2024 datasets.
+Pre-1.0. APIs may change. The package is being developed under the NAU ASD3 Outcomes Project (NIH-funded). It is a Python reimplementation of the [R `nsch` package](https://github.com/NAU-ASD3/nsch); the R version is the reference implementation. On the real 2016–2024 files, `get_clean_data` matches the R package's output on every cell except the randomly imputed 2016 education values, which match by group and by distribution. `tests/test_r_parity.py` checks this; it needs the real files, so it runs locally and is skipped in CI.
 
 ## Installation
 

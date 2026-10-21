@@ -29,6 +29,8 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from nsch import get_clean_data
+
 DATA_DIR = os.environ.get("NSCH_REAL_DATA_DIR")
 R_REFERENCE = os.environ.get("NSCH_R_REFERENCE")
 
@@ -75,10 +77,6 @@ A1_GRADE_SHARE_TOLERANCE = 0.005
 @pytest.fixture(scope="module")
 def py_df() -> pl.DataFrame:
     """The Python pipeline's output for 2016-2024."""
-    try:
-        from nsch import get_clean_data  # type: ignore[attr-defined]
-    except ImportError:
-        pytest.skip("get_clean_data isn't available yet (#26)")
     assert DATA_DIR is not None
     return get_clean_data(data_path=Path(DATA_DIR), years=YEARS)
 
