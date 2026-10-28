@@ -75,3 +75,4 @@ nav:
       - 2016 imputation: api/impute.md
       - Validation checks: api/validate.md
       - Downloading data: api/acquire.md
+      - Cleaning pipeline: api/pipeline.md
