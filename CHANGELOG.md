@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.10.28 (PR#105)
+
+- Added the 2025 survey year: "2025" is appended to the 40 configuration rules that apply in 2024, matching the R package's copy of `variable-config.json` byte for byte
+
 ## 2026.10.21.2 (PR#97)
 
 - Added `tests/test_r_parity.py`, which checks `get_clean_data` against the R package's 2016-2024 output on the real files; it's skipped unless `NSCH_REAL_DATA_DIR` and `NSCH_R_REFERENCE` are set
