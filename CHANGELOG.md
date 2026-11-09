@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.11.9 (PR#111)
+
+- `apply_do_labels` converts a column to an Enum only when every value in it has a label; columns whose `.do` labels cover only a top or bottom code (`a1_age`, `a2_age`, `famcount`, `hhcount`, `k11q43r`, `fpl_i1`, `k2q35a_1_years`) now stay numeric instead of losing every unlabeled value, matching NAU-ASD3/nsch
+- A `_label` companion of a column that stays numeric is dropped, which removes the empty `k2q35a_1_years_label` column
+
 ## 2026.10.28 (PR#105)
 
 - Added the 2025 survey year: "2025" is appended to the 40 configuration rules that apply in 2024, matching the R package's copy of `variable-config.json` byte for byte
