@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import random
 from typing import TYPE_CHECKING
 
@@ -24,14 +25,19 @@ def impute_a1_grade_2016(
     fine-grained categories used in 2017 and later.
 
     This function cannot use the standard per-year config-driven transform pipeline
-    because it requires cross-year proportion computation and probabilistic
-    redistribution - operations that the per-year transform/rename/merge system
-    does not support.
+    because it reads columns from the raw 2016 file that harmonization drops
+    (``a1_grade_if``, ``a1_grade_i``) and draws at random, operations that the
+    per-year transform/rename/merge system does not support.
 
     For each 2016 row where the imputation flag is set, the function reads the
-    coarse group from the raw 2016 ``.dta`` file, then uses weights derived from
-    the non-2016 ``a1_grade`` distribution to assign a fine category. Reproducible
-    given the same ``seed``.
+    coarse group from the raw 2016 ``.dta`` file, then draws a fine category within
+    that group. Reproducible given the same ``seed``.
+
+    The sampling weights are how often each fine category occurs among respondents
+    whose ``a1_grade`` was itself imputed (``a1_grade_if`` = 1) in 2017 to 2022, the
+    pool the original analysis used. They ship with the package as
+    ``nsch/data/a1_grade_2016_weights.csv``, the same file as the R package's, so the
+    2016 values do not depend on which other years ``combined_df`` contains.
 
     After assigning fine ``a1_grade`` values, the function deterministically
     updates ``higrade`` (3-level) and ``higrade_tvis`` (4-level) to be consistent,
@@ -63,6 +69,8 @@ def impute_a1_grade_2016(
     ValueError
         If a1_grade_i contains values outside the coarse values
         {1, 2, 3} for imputed rows
+    polars.exceptions.InvalidOperationError
+        If a drawn category is not a level of ``a1_grade``'s Enum
 
     Notes
     -----
@@ -132,7 +140,7 @@ def impute_a1_grade_2016(
             "Completed a vocational, trade, or business school program",
         ],
         "3": [
-            "Some College Credit, but No Degree",
+            "Some College Credit, but no Degree",
             "Associate Degree (AA, AS)",
             "Bachelor's Degree (BA, BS, AB)",
             "Master's Degree (MA, MS, MSW, MBA)",
@@ -150,7 +158,7 @@ def impute_a1_grade_2016(
         "Completed a vocational, trade, or business school program": (
             "High school (including vocational, trade, or business school)"
         ),
-        "Some College Credit, but No Degree": "More than high school",
+        "Some College Credit, but no Degree": "More than high school",
         "Associate Degree (AA, AS)": "More than high school",
         "Bachelor's Degree (BA, BS, AB)": "More than high school",
         "Master's Degree (MA, MS, MSW, MBA)": "More than high school",
@@ -168,7 +176,7 @@ def impute_a1_grade_2016(
         "Completed a vocational, trade, or business school program": (
             "High school (including vocational, trade, or business school)"
         ),
-        "Some College Credit, but No Degree": "Some college or Associate Degree",
+        "Some College Credit, but no Degree": "Some college or Associate Degree",
         "Associate Degree (AA, AS)": "Some college or Associate Degree",
         "Bachelor's Degree (BA, BS, AB)": "College degree or higher",
         "Master's Degree (MA, MS, MSW, MBA)": "College degree or higher",
@@ -177,50 +185,20 @@ def impute_a1_grade_2016(
         ),
     }
 
-    # Compute the distribution of fine a1_grade categories from non-2016 rows
-    # to use as sampling weights to redistribute coarse 2016 levels across
-    # fine categories.
-    fine_levels = pl.DataFrame(
-        {
-            "a1_grade": [level for levels in a1_groups.values() for level in levels],
-            "group": [group for group, levels in a1_groups.items() for _ in levels],
-        }
-    )
-
-    other_grades = (
-        (
-            indexed_df.filter((pl.col("year") != 2016) & pl.col("a1_grade").is_not_null())
-            .select(pl.col("a1_grade"))
-            .cast(pl.String)
-        )
-        .group_by("a1_grade")
-        .len()
-    )
-
-    weights = (
-        fine_levels.join(other_grades, on="a1_grade", how="left")
-        .with_columns(pl.col("len").fill_null(0))  # mirror R's counts[is.na(counts)] <- 0
-        # if the sum of a group is zero, fill with 1
-        .with_columns(
-            pl.when(pl.col("len").sum().over("group") == 0)
-            .then(1)
-            .otherwise(pl.col("len"))
-            .alias("counts")
-        )
-    )
-
-    # group -> (fine levels, weights) in a1_groups order
+    # Sampling weights: how often each fine category occurs among respondents whose a1_grade was
+    # itself imputed (a1_grade_if = 1) in 2017-2022, as in the original analysis. They ship with
+    # the package, so 2016's values don't depend on which other years combined_df holds.
+    # data-raw/a1_grade_2016_weights.R in NAU-ASD3/nsch rebuilds the file from the raw data.
+    weights_csv = importlib.resources.files("nsch.data").joinpath("a1_grade_2016_weights.csv")
+    counts = dict(pl.read_csv(weights_csv.read_bytes()).select("label", "n").iter_rows())
     group_weights = {
-        group: (level, weight)
-        for group, level, weight in weights.group_by("group", maintain_order=True)
-        .agg("a1_grade", "counts")
-        .iter_rows()
+        group: (levels, [counts[level] for level in levels]) for group, levels in a1_groups.items()
     }
 
     # Probabilistically assign fine categories within each coarse group.
     rand_gen = random.Random(seed)
     coarse = rows_2016["coarse_data"].to_list()
-    new_a1 = [None] * len(coarse)
+    new_a1: list[str | None] = [None] * len(coarse)
     for group, (levels, weight) in group_weights.items():
         index = [i for i, coarse_vals in enumerate(coarse) if coarse_vals == group]
         if index:
