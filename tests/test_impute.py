@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +23,7 @@ A1_LEVELS = [
     "9th-12th grade; No diploma",
     "High School Graduate or GED Completed",
     "Completed a vocational, trade, or business school program",
-    "Some College Credit, but No Degree",
+    "Some College Credit, but no Degree",
     "Associate Degree (AA, AS)",
     "Bachelor's Degree (BA, BS, AB)",
     "Master's Degree (MA, MS, MSW, MBA)",
@@ -201,3 +202,76 @@ def test_a1_grade_imputation_raises_when_dta_lacks_required_columns(tmp_path: Pa
     )
     with pytest.raises(ValueError, match="must contain hhid, a1_grade_if, and a1_grade_i"):
         impute_a1_grade_2016(combine_df, no_coarse_dta, seed=1)
+
+
+def test_weights_file_has_the_nine_categories_from_imputed_2017_2022_rows() -> None:
+    """The shipped weights match the R package's file; 6,626 rows were imputed in 2017-2022."""
+    weights_csv = importlib.resources.files("nsch.data").joinpath("a1_grade_2016_weights.csv")
+    weights = pl.read_csv(weights_csv.read_bytes())
+    expected = pl.DataFrame(
+        {
+            "code": list(range(1, 10)),
+            "group": [1, 1, 2, 2, 3, 3, 3, 3, 3],
+            "label": A1_LEVELS,
+            "n": [111, 216, 1149, 380, 1065, 677, 1778, 957, 293],
+        }
+    )
+    assert_frame_equal(weights, expected)
+    assert weights["n"].sum() == 6626
+
+
+def test_2016_draws_do_not_depend_on_the_other_years() -> None:
+    small = make_combined_test_dataframe(n_rows_2016=100, n_rows_other_years=40, seed=1)
+    large = make_combined_test_dataframe(n_rows_2016=100, n_rows_other_years=400, seed=2)
+    only_2016 = small.filter(pl.col("year") == 2016)
+    results = [
+        impute_a1_grade_2016(df, PATH_2016_LARGE_DTA, seed=1).filter(pl.col("year") == 2016)
+        for df in (small, large, only_2016)
+    ]
+    assert_frame_equal(results[1], results[0])
+    assert_frame_equal(results[2], results[0])
+
+
+def write_top_group_dta(dta_path: Path, n_rows: int = 200) -> None:
+    """Write a 2016 file whose rows are all imputed into the top coarse group (3)."""
+    pyreadstat.write_dta(
+        pl.DataFrame(
+            {
+                "year": [2016] * n_rows,
+                "hhid": list(range(1, n_rows + 1)),
+                "a1_grade_if": [1] * n_rows,
+            }
+        ).with_columns(a1_grade_i=pl.lit(3)),
+        str(dta_path),
+    )
+
+
+def test_some_college_is_drawn_for_the_top_group(tmp_path: Path) -> None:
+    dta_path = tmp_path / "top_group.dta"
+    write_top_group_dta(dta_path)
+    combined = make_combined_test_dataframe(n_rows_2016=200, n_rows_other_years=40)
+    result = impute_a1_grade_2016(combined, dta_path, seed=1).filter(pl.col("year") == 2016)
+    drawn = set(result["a1_grade"].cast(pl.String).to_list())
+    assert "Some College Credit, but no Degree" in drawn
+    assert drawn <= set(A1_GROUPS["3"])
+
+
+def test_raises_when_a_drawn_category_is_not_a_level_of_a1_grade(tmp_path: Path) -> None:
+    """With the old "No Degree" spelling as a level, the drawn "no Degree" fails the Enum cast"""
+    dta_path = tmp_path / "top_group.dta"
+    write_top_group_dta(dta_path)
+    combined = make_combined_test_dataframe(n_rows_2016=200, n_rows_other_years=40)
+    old_levels = [
+        "Some College Credit, but No Degree"
+        if level == "Some College Credit, but no Degree"
+        else level
+        for level in A1_LEVELS
+    ]
+    combined = combined.with_columns(
+        pl.col("a1_grade")
+        .cast(pl.String)
+        .replace("Some College Credit, but no Degree", "Some College Credit, but No Degree")
+        .cast(pl.Enum(old_levels))
+    )
+    with pytest.raises(pl.exceptions.InvalidOperationError):
+        impute_a1_grade_2016(combined, dta_path, seed=1)

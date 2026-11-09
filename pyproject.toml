@@ -1,6 +1,6 @@
 [project]
 name = "nsch"
-version = "2026.11.9"
+version = "2026.11.9.1"
 description = "NSCH data preparation toolkit: download, harmonize, and combine National Survey of Children's Health data across years."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,11 +43,13 @@ build-backend = "hatchling.build"
 packages = ["src/nsch"]
 artifacts = [
     "src/nsch/data/variable-config.json",
+    "src/nsch/data/a1_grade_2016_weights.csv",
 ]
 
 [tool.hatch.build.targets.sdist]
 artifacts = [
     "src/nsch/data/variable-config.json",
+    "src/nsch/data/a1_grade_2016_weights.csv",
 ]
 
 # --- uv -------------------------------------------------------------------
