@@ -345,6 +345,38 @@ def test_values_labeled_only_by_an_override_still_give_an_enum() -> None:
     assert_frame_equal(result, expected)
 
 
+def test_label_companion_of_a_column_with_only_missing_codes_is_dropped() -> None:
+    lf = pl.LazyFrame({"x": [1, 996], "x_label": ["a", None]})
+    define_lf = pl.LazyFrame({"variable": ["x"], "value": [".m"], "desc": ["No valid response"]})
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"x": [1, None]})
+    assert_frame_equal(result, expected)
+
+
+def test_column_with_no_unlabeled_values_in_a_year_still_gives_an_enum() -> None:
+    """The decision is per year: with only sentinel codes there's no unlabeled value."""
+    lf = pl.LazyFrame({"a1_age": [997, 997, None]})
+    define_lf = pl.LazyFrame(
+        {"variable": ["a1_age"] * 2, "value": ["70", ".n"], "desc": ["70 or older", "NIU"]}
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {"a1_age": [None, None, None]}, schema={"a1_age": pl.Enum(["70 or older"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_nan_counts_as_missing_when_deciding() -> None:
+    """NaN is missing, as in R, so a column whose other values are all labeled is an Enum."""
+    lf = pl.LazyFrame({"a1_age": [70.0, float("nan")]})
+    define_lf = pl.LazyFrame({"variable": ["a1_age"], "value": ["70"], "desc": ["70 or older"]})
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {"a1_age": ["70 or older", None]}, schema={"a1_age": pl.Enum(["70 or older"])}
+    )
+    assert_frame_equal(result, expected)
+
+
 def test_top_coded_columns_from_a_do_file_stay_numeric(tmp_path: Path) -> None:
     """The real .do files add the top-code labels in a separate block after the missing codes."""
     do_file = tmp_path / "topcoded.do"
