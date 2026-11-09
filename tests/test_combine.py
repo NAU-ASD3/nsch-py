@@ -282,6 +282,122 @@ def test_apply_do_labels_correctly_handles_nulls_from_parse_do(tmp_path: Path) -
     assert_frame_equal(result, expected)
 
 
+def test_column_with_only_its_top_code_labeled_stays_numeric() -> None:
+    """The .do files label only a1_age's top code, so an Enum would null every other age."""
+    lf = pl.LazyFrame({"a1_age": [35, 70, 42, 997]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["a1_age"] * 3,
+            "value": ["70", ".m", ".n"],
+            "desc": ["70 or older", "No valid response", "Not in universe"],
+        }
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"a1_age": [35, 70, 42, None]})
+    assert_frame_equal(result, expected)
+
+
+def test_label_companion_of_a_column_that_stays_numeric_is_dropped() -> None:
+    """k2q35a_1_years: labels for 1 and 15, a transform label for 15, unlabeled values between."""
+    lf = pl.LazyFrame(
+        {
+            "k2q35a_1_years": [1, 7, 15, 996],
+            "k2q35a_1_years_label": [None, None, "15, 16 or 17", None],
+        }
+    )
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["k2q35a_1_years"] * 3,
+            "value": ["1", "15", ".m"],
+            "desc": ["0 or 1", "15 to 17", "No valid response"],
+        }
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"k2q35a_1_years": [1, 7, 15, None]})
+    assert_frame_equal(result, expected)
+
+
+def test_label_companion_of_a_column_without_define_entries_is_dropped() -> None:
+    lf = pl.LazyFrame(
+        {"k2q35a_1_years": [3, 15, 997], "k2q35a_1_years_label": [None, "15, 16 or 17", None]}
+    )
+    define_lf = pl.LazyFrame({"variable": ["sc_sex"], "value": ["1"], "desc": ["Male"]})
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"k2q35a_1_years": [3, 15, None]})
+    assert_frame_equal(result, expected)
+
+
+def test_values_labeled_only_by_an_override_still_give_an_enum() -> None:
+    """Once the _label override counts, every value has a label, so the column is categorical."""
+    lf = pl.LazyFrame({"k2q01_d": [1, 2, 6], "k2q01_d_label": ["Excellent", "Very good", None]})
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["k2q01_d"] * 2,
+            "value": ["6", ".m"],
+            "desc": ["Child does not have any teeth", "No valid response"],
+        }
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {"k2q01_d": ["Excellent", "Very good", "Child does not have any teeth"]},
+        schema={"k2q01_d": pl.Enum(["Child does not have any teeth", "Excellent", "Very good"])},
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_label_companion_of_a_column_with_only_missing_codes_is_dropped() -> None:
+    lf = pl.LazyFrame({"x": [1, 996], "x_label": ["a", None]})
+    define_lf = pl.LazyFrame({"variable": ["x"], "value": [".m"], "desc": ["No valid response"]})
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame({"x": [1, None]})
+    assert_frame_equal(result, expected)
+
+
+def test_column_with_no_unlabeled_values_in_a_year_still_gives_an_enum() -> None:
+    """The decision is per year: with only sentinel codes there's no unlabeled value."""
+    lf = pl.LazyFrame({"a1_age": [997, 997, None]})
+    define_lf = pl.LazyFrame(
+        {"variable": ["a1_age"] * 2, "value": ["70", ".n"], "desc": ["70 or older", "NIU"]}
+    )
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {"a1_age": [None, None, None]}, schema={"a1_age": pl.Enum(["70 or older"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_nan_counts_as_missing_when_deciding() -> None:
+    """NaN is missing, as in R, so a column whose other values are all labeled is an Enum."""
+    lf = pl.LazyFrame({"a1_age": [70.0, float("nan")]})
+    define_lf = pl.LazyFrame({"variable": ["a1_age"], "value": ["70"], "desc": ["70 or older"]})
+    result = apply_do_labels(lf, define_lf)
+    expected = pl.LazyFrame(
+        {"a1_age": ["70 or older", None]}, schema={"a1_age": pl.Enum(["70 or older"])}
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_top_coded_columns_from_a_do_file_stay_numeric(tmp_path: Path) -> None:
+    """The real .do files add the top-code labels in a separate block after the missing codes."""
+    do_file = tmp_path / "topcoded.do"
+    do_file.write_text(
+        'label define a1_age_lab  .m "No valid response"\n'
+        '    label define a1_age_lab  .n "Not in universe", add\n'
+        "cap label values a1_age a1_age_lab\n"
+        'label define fpl_i1_lab  .m "No valid response"\n'
+        "cap label values fpl_i1 fpl_i1_lab\n"
+        'label define a1_age_lab 70 "70 or older", add\n'
+        'label define fpl_i1_lab 50 "50 or less", add\n'
+        'label define fpl_i1_lab 400 "400 or more", add\n'
+        "cap label values a1_age a1_age_lab\n"
+        "cap label values fpl_i1 fpl_i1_lab\n"
+    )
+    lf = pl.LazyFrame({"a1_age": [18, 45, 70], "fpl_i1": [50, 175, 400]})
+    result = apply_do_labels(lf, parse_do(do_file).define)
+    expected = pl.LazyFrame({"a1_age": [18, 45, 70], "fpl_i1": [50, 175, 400]})
+    assert_frame_equal(result, expected)
+
+
 # Testing Functions for combine_years
 
 

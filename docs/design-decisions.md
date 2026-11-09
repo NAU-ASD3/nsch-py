@@ -317,9 +317,14 @@ accidentally returns a `DataFrame`, the result of an unnecessary
 `.collect()`, is caught by `mypy --strict`. The lazy/eager boundary
 becomes visible at the type level.
 
-The only authorized `.collect()` in the core pipeline is inside
-`combine.combine_years()`. Tests are allowed to call `.collect()` for
-assertions, but no production code path does. The anti-pattern this
+The only authorized `.collect()` that materializes the data is inside
+`combine.combine_years()`. One small, deliberate exception sits in
+`combine.apply_do_labels()`: before it builds the labeling expressions,
+it makes one pass over each year's labeled columns to learn which
+override labels occur and which columns hold values without a label.
+Both answers depend on the data, not the plan, and the pass returns a
+single row. Tests are allowed to call `.collect()` for assertions, but
+no other production code path does. The anti-pattern this
 guards against is a mid-pipeline `.collect()` inserted for debugging
 and left in place: output is unchanged, but the query plan is severed,
 everything downstream becomes opaque to the optimizer for everything

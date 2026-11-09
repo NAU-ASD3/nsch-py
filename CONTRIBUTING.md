@@ -56,7 +56,7 @@ A green local run is the gate for opening a PR.
 These are not preferences. Violations are bugs:
 
 1. **Stata tagged NAs are preserved via the sentinel-code scheme.** `read_dta` maps `.m → 996`, `.n → 997`, `.l → 998`, `.d → 999`. The four missingness types must survive as distinct numeric values until `apply_do_labels` converts them to null.
-2. **The pipeline is `LazyFrame` end-to-end.** One `.collect()` per top-level call, inside `combine_years` or at the integration-test boundary. No mid-pipeline collects.
+2. **The pipeline is `LazyFrame` end-to-end.** One `.collect()` per top-level call, inside `combine_years` or at the integration-test boundary. No mid-pipeline collects, apart from the one-row pass `apply_do_labels` makes over the labeled columns (see design-decisions §5).
 3. **No mutation.** Every transform returns a new frame.
 4. **Functions are small and single-purpose.** Aim for under 50 lines.
 5. **Config is loaded once as a Pydantic model.** Downstream code consumes the model, not a raw dict.
