@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#113)`
+This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#NN)`
 section per PR, newest first. Versions follow a date-based scheme, `YYYY.M.DD`,
 bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
@@ -161,7 +161,7 @@ so each version stays unique and the date stays honest.
 
 ## 2026.6.29 (PR#46)
 
-- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#113)` sections, micro segments for same-day collisions.
+- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
 
 ## 2026.6.17 (PR#8)
 
