@@ -54,6 +54,54 @@ def _scan_override_labels(
     return override_values
 
 
+def _find_partly_labeled(
+    lf: pl.LazyFrame,
+    schema: pl.Schema,
+    mapped_cols: list[tuple[str, str | None, dict[float, str]]],
+    sentinel_codes: list[int],
+) -> set[str]:
+    """Helper for ``apply_do_labels``: the labeled numeric columns that hold unlabeled values.
+
+    A value counts as labeled when the ``.do`` file gives it a label, its row has a ``_label``
+    override, or it is a sentinel code. Null values are ignored.
+
+    Parameters
+    ----------
+    lf : pl.LazyFrame
+        The frame of raw numeric survey data ingested by ``apply_do_labels``.
+    schema : pl.Schema
+        The schema of ``lf``.
+    mapped_cols : list[tuple[str, str | None, dict[float, str]]]
+        The column name, ``_label`` column name and value-to-label map for each column that
+        has ``.do`` labels, as built in ``apply_do_labels``.
+    sentinel_codes : list[int]
+        The 996-999 sentinel codes.
+
+    Returns
+    -------
+    set[str]
+        The names of the columns with at least one unlabeled value.
+
+    Notes
+    -----
+    Like ``_scan_override_labels``, this collects on purpose: whether a column is partly labeled
+    depends on the values it holds. Projection pushdown keeps the scan to the labeled columns.
+    """
+    checks: list[pl.Expr] = []
+    for col, label_col, mapping in mapped_cols:
+        if not schema[col].is_numeric():
+            continue
+        known = pl.Series([*mapping, *sentinel_codes], dtype=pl.Float64)
+        unlabeled = pl.col(col).is_not_null() & ~pl.col(col).cast(pl.Float64).is_in(known.implode())
+        if label_col:
+            unlabeled = unlabeled & pl.col(label_col).is_null()
+        checks.append(unlabeled.any().alias(col))
+    if not checks:
+        return set()
+    flags = lf.select(checks).collect(engine="in-memory").row(0, named=True)
+    return {col for col, has_unlabeled in flags.items() if has_unlabeled}
+
+
 def apply_do_labels(
     lf: pl.LazyFrame, define_lf: pl.LazyFrame, alias: dict[str, str] | None = None
 ) -> pl.LazyFrame:
@@ -64,6 +112,12 @@ def apply_do_labels(
     exists (created by ``transform_values``), those labels override the ``.do``-derived labels
     for matching rows, and the companion column is removed. Columns with no matching ``define``
     entries are left numeric, but `TaggedNA` codes are still replaced with ``None``.
+
+    A column becomes an Enum only when every value in it has a label. Some ``.do`` files label
+    just the top or bottom code of a count or an age (``a1_age`` 70, "70 or older", or
+    ``hhcount`` 10, "10 or more"). An Enum would turn every other value into null, so these
+    columns stay numeric, with sentinel codes replaced by ``None``, as they are in Stata. A
+    ``_label`` companion of a column that stays numeric is dropped too.
 
     When a column's name in ``lf`` differs from the variable name in ``define_lf`` because an
     upstream ``rename_vars`` or ``merge_vars`` change the column name, pass an ``alias`` map so
@@ -94,8 +148,9 @@ def apply_do_labels(
     Returns
     -------
     pl.LazyFrame
-        Labeled columns converted to ``Enum``, and other numeric columns
-        left numeric, with sentinel codes replaced by ``None`` in both.
+        Labeled columns converted to ``Enum``, and other numeric columns (including those
+        with labels on only some values) left numeric, with sentinel codes replaced by
+        ``None`` in both.
 
     Examples
     --------
@@ -164,6 +219,7 @@ def apply_do_labels(
     # combines the defined_vars + value_maps checks
     mapped_cols: list[tuple[str, str | None, dict[float, str]]] = []
     plain_numeric_cols: list[str] = []
+    label_cols_to_drop: list[str] = []
 
     for col in lf_vars:
         if col.endswith("_label"):
@@ -177,16 +233,28 @@ def apply_do_labels(
             lookup_name = col
         mapping = value_maps.get(lookup_name)
 
+        label_col: str | None = f"{col}_label" if f"{col}_label" in lf_var_set else None
         if mapping:
-            label_col: str | None = f"{col}_label" if f"{col}_label" in lf_var_set else None
             mapped_cols.append((col, label_col, mapping))
-        elif schema[col].is_numeric():
+        else:
+            if schema[col].is_numeric():
+                plain_numeric_cols.append(col)
+            # Labels only take effect through an Enum, so a column left as it is drops them
+            if label_col:
+                label_cols_to_drop.append(label_col)
+
+    # A labeled column holding values without a label stays numeric: an Enum would null them out
+    partly_labeled = _find_partly_labeled(lf, schema, mapped_cols, sentinel_codes)
+    for col, label_col, _ in mapped_cols:
+        if col in partly_labeled:
             plain_numeric_cols.append(col)
+            if label_col:
+                label_cols_to_drop.append(label_col)
+    mapped_cols = [entry for entry in mapped_cols if entry[0] not in partly_labeled]
 
     override_values = _scan_override_labels(lf, mapped_cols)
 
     exprs: list[pl.Expr] = []
-    label_cols_to_drop: list[str] = []
 
     for col, label_col, mapping in mapped_cols:
         col_dtype = schema[col]
