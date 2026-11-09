@@ -2,13 +2,13 @@
 
 All notable changes to this project are documented here.
 
-This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#NN)`
+This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#113)`
 section per PR, newest first. Versions follow a date-based scheme, `YYYY.M.DD`,
 bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.11.9.1 (PR#NN)
+## 2026.11.9.1 (PR#113)
 
 - `impute_a1_grade_2016` now draws each 2016 row's detailed category with weights from how often it occurs among respondents whose `a1_grade` was itself imputed (`a1_grade_if` = 1) in 2017-2022, as the original analysis did. Before, the weights came from every respondent in the other years of `combined_df`, so adding a year changed 2016's values and a 2016-only build used equal weights. The counts ship in `nsch/data/a1_grade_2016_weights.csv`, byte-identical to NAU-ASD3/nsch's copy, which that repository's `data-raw/a1_grade_2016_weights.R` rebuilds.
 - The imputation spelled one category "Some College Credit, but No Degree", which matches no level in the data, so it was never drawn. It's now "Some College Credit, but no Degree". In the 2016 output that category gains about 200 rows from the rest of the top group, and about 200 rows of `higrade_tvis` move from "College degree or higher" to "Some college or Associate Degree".
@@ -161,7 +161,7 @@ so each version stays unique and the date stays honest.
 
 ## 2026.6.29 (PR#46)
 
-- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
+- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#113)` sections, micro segments for same-day collisions.
 
 ## 2026.6.17 (PR#8)
 
