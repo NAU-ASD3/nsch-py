@@ -401,6 +401,24 @@ def test_top_coded_columns_from_a_do_file_stay_numeric(tmp_path: Path) -> None:
 # Testing Functions for combine_years
 
 
+def test_stratum_stays_an_integer_even_when_the_do_labels_it() -> None:
+    """The 2016 .do labels stratum 1 and 2; no later year does."""
+    lf = pl.LazyFrame({"stratum": [1, 2, 2], "stratum_label": [None, None, None]}).cast(
+        {"stratum": pl.Int64, "stratum_label": pl.String}
+    )
+    define_lf = pl.LazyFrame(
+        {
+            "variable": ["stratum"] * 3,
+            "value": ["1", "2", ".m"],
+            "desc": ["Stratum 1", "Stratum 2", "No valid response"],
+        }
+    )
+
+    result = apply_do_labels(lf, define_lf).collect()
+
+    assert_frame_equal(result, pl.DataFrame({"stratum": [1, 2, 2]}))
+
+
 def test_combines_multiple_year_frames_in_order() -> None:
     """Rows from each year stack in list order with every year present once."""
     y16 = pl.LazyFrame({"year": [2016, 2016, 2016], "x": [1, 2, 3]})
@@ -446,10 +464,7 @@ def test_enum_categories_are_unioned_across_years() -> None:
 
 
 def test_column_labeled_in_only_some_years_is_combined_as_text_with_a_warning() -> None:
-    """An Enum column that is numeric in another year becomes text, as in R, with a warning.
-
-    The real data does this: the 2016 .do file labels stratum and no later year does.
-    """
+    """An Enum column that is numeric in another year becomes text, as in R, with a warning."""
     y16 = pl.LazyFrame({"year": [2016, 2016], "stratum": ["Stratum 1", "Stratum 2"]}).with_columns(
         pl.col("stratum").cast(pl.Enum(["Stratum 1", "Stratum 2"]))
     )

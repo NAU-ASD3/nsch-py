@@ -14,6 +14,12 @@ __all__ = [
 ]
 
 
+# Columns apply_do_labels leaves unconverted in every year. stratum is 1 or 2 in every year, and
+# only the 2016 .do labels it ("Stratum 1", "Stratum 2"), so labeling it would make it an Enum in
+# 2016 and an integer in every other year.
+UNLABELED_COLUMNS = frozenset({"stratum"})
+
+
 def _scan_labels(
     lf: pl.LazyFrame,
     schema: pl.Schema,
@@ -96,6 +102,10 @@ def apply_do_labels(
     columns stay numeric, with sentinel codes replaced by ``None``, as they are in Stata. The
     decision is made per year, from that year's data. The ``_label`` companion of any column
     that isn't converted to an Enum is dropped too.
+
+    ``stratum`` is never converted. It is 1 or 2 in every year, and only the 2016 ``.do`` file
+    labels it ("Stratum 1", "Stratum 2"), so an Enum would make it differ between 2016 and the
+    other years.
 
     When a column's name in ``lf`` differs from the variable name in ``define_lf`` because an
     upstream ``rename_vars`` or ``merge_vars`` change the column name, pass an ``alias`` map so
@@ -209,7 +219,7 @@ def apply_do_labels(
         # fire and the column is natively named, so its own entries are the right source
         if lookup_name not in defined_vars and col in defined_vars:
             lookup_name = col
-        mapping = value_maps.get(lookup_name)
+        mapping = None if col in UNLABELED_COLUMNS else value_maps.get(lookup_name)
 
         label_col: str | None = f"{col}_label" if f"{col}_label" in lf_var_set else None
         if mapping:
@@ -325,9 +335,9 @@ def combine_years(year_list: list[pl.LazyFrame]) -> pl.DataFrame:
         For each column that is an ``Enum`` in some years but another dtype
         in others, naming the column and those years. The column is combined
         as text: labels in the labeled years, the values written out in the
-        rest. This matches R's ``rbindlist``, and it happens with the real
-        data: the 2016 .do file labels ``stratum`` ("Stratum 1"), and no later
-        year does.
+        rest. This matches R's ``rbindlist``. It doesn't happen on the
+        2016 to 2025 files, but a column that a future ``.do`` file labels
+        differently would trigger it.
 
     Examples
     --------
