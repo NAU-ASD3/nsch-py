@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.11.9.2 (PR#116)
+
+- `apply_do_labels` no longer converts `stratum` to an Enum. Only the 2016 `.do` file labels it ("Stratum 1", "Stratum 2"), so `combine_years` warned and gave a text column mixing those labels with "1" and "2" from the other years. `stratum` is now an integer, 1 or 2, in every year, matching NAU-ASD3/nsch
+
 ## 2026.11.9.1 (PR#113)
 
 - `impute_a1_grade_2016` now draws each 2016 row's detailed category with weights from how often it occurs among respondents whose `a1_grade` was itself imputed (`a1_grade_if` = 1) in 2017-2022, as the original analysis did. Before, the weights came from every respondent in the other years of `combined_df`, so adding a year changed 2016's values and a 2016-only build used equal weights. The counts ship in `nsch/data/a1_grade_2016_weights.csv`, byte-identical to NAU-ASD3/nsch's copy, which that repository's `data-raw/a1_grade_2016_weights.R` rebuilds.
