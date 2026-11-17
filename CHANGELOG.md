@@ -2,13 +2,13 @@
 
 All notable changes to this project are documented here.
 
-This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#NN)`
+This mirrors the R `nsch` package's `NEWS.md`: one `## YYYY.M.DD (PR#117)`
 section per PR, newest first. Versions follow a date-based scheme, `YYYY.M.DD`,
 bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
-## 2026.11.17 (PR#NN)
+## 2026.11.17 (PR#117)
 
 - `tests/test_r_parity.py` covers 2016-2025. It runs against the R export from NAU-ASD3/nsch 2026.11.9.2 (commit 0d4f6e2), 431,222 rows by 167 columns, written by `export-harmonized.R` in NAU-ASD3/nsch-ml-paper. All nine checks pass, including every cell outside the 2016 `a1_grade` draws.
 
@@ -169,7 +169,7 @@ so each version stays unique and the date stays honest.
 
 ## 2026.6.29 (PR#46)
 
-- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#NN)` sections, micro segments for same-day collisions.
+- Aligned the changelog and versioning convention with the R `nsch` package's `NEWS.md`: per-PR `## YYYY.M.DD (PR#117)` sections, micro segments for same-day collisions.
 
 ## 2026.6.17 (PR#8)
 
