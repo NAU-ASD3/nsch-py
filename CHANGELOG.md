@@ -8,6 +8,10 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.11.17 (PR#NN)
+
+- `tests/test_r_parity.py` covers 2016-2025. It runs against the R export from NAU-ASD3/nsch 2026.11.9.2 (commit 0d4f6e2), 431,222 rows by 167 columns, written by `export-harmonized.R` in NAU-ASD3/nsch-ml-paper. All nine checks pass, including every cell outside the 2016 `a1_grade` draws.
+
 ## 2026.11.9.2 (PR#116)
 
 - `apply_do_labels` no longer converts `stratum` to an Enum. Only the 2016 `.do` file labels it ("Stratum 1", "Stratum 2"), so `combine_years` warned and gave a text column mixing those labels with "1" and "2" from the other years. `stratum` is now an integer, 1 or 2, in every year, matching NAU-ASD3/nsch
