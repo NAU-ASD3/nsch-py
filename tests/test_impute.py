@@ -275,3 +275,94 @@ def test_raises_when_a_drawn_category_is_not_a_level_of_a1_grade(tmp_path: Path)
     )
     with pytest.raises(pl.exceptions.InvalidOperationError):
         impute_a1_grade_2016(combined, dta_path, seed=1)
+
+
+def make_with_file_values(
+    dta_path: Path,
+    a1_grade_i: list[int],
+    file_higrade: list[int | None],
+    file_tvis: list[int | None],
+) -> pl.DataFrame:
+    """2016 rows that already hold higrade and higrade_tvis, as the real 2016 file does when a
+    second adult's education was reported. Levels are given by position, starting at 1, and
+    ``None`` is a row with nothing in the file. Writes the matching 2016 ``.dta`` to ``dta_path``.
+    """
+    n_rows = len(a1_grade_i)
+    pyreadstat.write_dta(
+        pl.DataFrame(
+            {
+                "year": [2016] * n_rows,
+                "hhid": list(range(1, n_rows + 1)),
+                "a1_grade_if": [1] * n_rows,
+                "a1_grade_i": a1_grade_i,
+            }
+        ),
+        str(dta_path),
+    )
+    combined = make_combined_test_dataframe(n_rows_2016=n_rows, n_rows_other_years=40)
+    filled = combined.filter(pl.col("year") == 2016).with_columns(
+        higrade=pl.Series(
+            [None if i is None else HIGRADE_LEVELS[i - 1] for i in file_higrade],
+            dtype=HIGRADE_ENUM,
+        ),
+        higrade_tvis=pl.Series(
+            [None if i is None else HIGRADE_TVIS_LEVELS[i - 1] for i in file_tvis],
+            dtype=TVIS_ENUM,
+        ),
+    )
+    return pl.concat([filled, combined.filter(pl.col("year") != 2016)])
+
+
+def test_a_higrade_value_in_the_2016_file_is_kept_unless_adult_1s_group_is_higher(
+    tmp_path: Path,
+) -> None:
+    """Row by row: the file is higher (kept), adult 1's group is higher, nothing in the file,
+    the file is higher, adult 1's group is higher, the file is higher."""
+    dta_path = tmp_path / "file_values.dta"
+    combined = make_with_file_values(
+        dta_path,
+        a1_grade_i=[1, 2, 2, 2, 3, 1],
+        file_higrade=[3, 1, None, 3, 1, 2],
+        file_tvis=[4, 1, None, 3, 1, 2],
+    )
+    result = impute_a1_grade_2016(combined, dta_path, seed=1).filter(pl.col("year") == 2016)
+    assert result["higrade"].cast(pl.String).to_list() == [
+        HIGRADE_LEVELS[i - 1] for i in [3, 2, 2, 3, 3, 2]
+    ]
+    # Group 2 always implies "High school" in higrade_tvis, so every row but the fifth is fixed.
+    # The fifth is some college or higher, whichever category was drawn.
+    tvis = result["higrade_tvis"].cast(pl.String).to_list()
+    assert tvis[:4] + tvis[5:] == [HIGRADE_TVIS_LEVELS[i - 1] for i in [4, 2, 2, 3, 2]]
+    assert tvis[4] in HIGRADE_TVIS_LEVELS[2:4]
+
+
+def test_higrade_and_higrade_tvis_are_the_higher_of_the_file_and_adult_1(tmp_path: Path) -> None:
+    """On 300 random rows, both columns equal the higher of the file's level and the level the
+    imputed a1_grade implies; a row with nothing in the file takes the implied level."""
+    rng = np.random.default_rng(3)
+    n_rows = 300
+    a1_grade_i = rng.integers(1, 4, size=n_rows).tolist()
+    file_higrade = [
+        None if i == 0 else int(i)
+        for i in rng.choice([0, 1, 2, 3], size=n_rows, p=[1 / 3] + [2 / 9] * 3)
+    ]
+    file_tvis = [
+        None if i is None else i if i < 3 else int(rng.integers(3, 5)) for i in file_higrade
+    ]
+    dta_path = tmp_path / "file_values.dta"
+    combined = make_with_file_values(dta_path, a1_grade_i, file_higrade, file_tvis)
+    result = impute_a1_grade_2016(combined, dta_path, seed=1).filter(pl.col("year") == 2016)
+
+    higrade_rank = [HIGRADE_LEVELS.index(v) + 1 for v in result["higrade"].cast(pl.String)]
+    assert higrade_rank == [
+        max(a1, 0 if file is None else file)
+        for a1, file in zip(a1_grade_i, file_higrade, strict=True)
+    ]
+    implied_tvis = [
+        HIGRADE_TVIS_LEVELS.index(FINE_TO_TVIS[a1]) + 1 for a1 in result["a1_grade"].cast(pl.String)
+    ]
+    tvis_rank = [HIGRADE_TVIS_LEVELS.index(v) + 1 for v in result["higrade_tvis"].cast(pl.String)]
+    assert tvis_rank == [
+        max(implied, 0 if file is None else file)
+        for implied, file in zip(implied_tvis, file_tvis, strict=True)
+    ]
