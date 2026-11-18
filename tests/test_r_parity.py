@@ -1,17 +1,18 @@
-"""R-parity test: ``get_clean_data`` against the cached R 2016-2024 output (#27).
+"""R-parity test: ``get_clean_data`` against the cached R 2016-2025 output (#27).
 
 This runs only on a machine with the real NSCH files. Set two environment
 variables:
 
 - ``NSCH_REAL_DATA_DIR``: the folder of NSCH Stata files (``.dta`` and ``.do``)
   that ``get_all_years`` searches.
-- ``NSCH_R_REFERENCE``: the R export, ``nsch-harmonized-2016-2024_<date>.csv.gz``,
+- ``NSCH_R_REFERENCE``: the R export, ``nsch-harmonized-2016-2025_<date>.csv.gz``,
   written by ``export-harmonized.R`` in NAU-ASD3/nsch-ml-paper.
 
 Without both, every test here is skipped, which is how CI runs it.
 
-The reference used for the wrap-up was generated on 2026-10-12 from
-NAU-ASD3/nsch commit fbdccb4: 386,083 rows by 168 columns.
+The 2016-2025 reference comes from NAU-ASD3/nsch 2026.11.9.2 (commit 0d4f6e2):
+431,222 rows by 167 columns. The 2016-2024 reference used for the wrap-up was
+generated on 2026-10-12 from commit fbdccb4: 386,083 rows by 168 columns.
 
 Rows are matched on (year, hhid), so neither side's row order matters. Every
 cell must agree except where the 2016 ``a1_grade`` imputation draws at random:
@@ -39,7 +40,7 @@ pytestmark = pytest.mark.skipif(
     reason="set NSCH_REAL_DATA_DIR and NSCH_R_REFERENCE to run the R-parity test",
 )
 
-YEARS = list(range(2016, 2025))
+YEARS = list(range(2016, 2026))
 KEY = ["year", "hhid"]
 
 # The imputation picks a fine a1_grade category within the coarse group (1, 2, 3)
@@ -73,7 +74,7 @@ A1_GRADE_SHARE_TOLERANCE = 0.005
 
 @pytest.fixture(scope="module")
 def py_df() -> pl.DataFrame:
-    """The Python pipeline's output for 2016-2024."""
+    """The Python pipeline's output for 2016-2025."""
     assert DATA_DIR is not None
     return get_clean_data(data_path=Path(DATA_DIR), years=YEARS)
 
