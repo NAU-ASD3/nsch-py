@@ -8,6 +8,11 @@ bumped per PR to the date it lands. When two PRs land on the same day, the
 second and later append a micro segment (`YYYY.M.DD.MICRO`, e.g. `2026.6.29.1`)
 so each version stays unique and the date stays honest.
 
+## 2026.11.18 (PR#NN)
+
+- `impute_a1_grade_2016` no longer lowers `higrade` or `higrade_tvis`. Both are the highest education among the adults in the household, and for 327 of the 1,524 households whose 2016 `a1_grade` is imputed the file already has a value, because a second adult's education was reported. The function replaced that value with the one adult 1's imputed education implies; it now keeps the higher of the two, matching NAU-ASD3/nsch. In the 2016 output 28 values of `higrade` and 53 of `higrade_tvis` change, all upward, and nothing else does.
+- `tests/test_r_parity.py` names the R reference it now needs, the export from NAU-ASD3/nsch 2026.11.18
+
 ## 2026.11.17 (PR#117)
 
 - `tests/test_r_parity.py` covers 2016-2025. It runs against the R export from NAU-ASD3/nsch 2026.11.9.2 (commit 0d4f6e2), 431,222 rows by 167 columns, written by `export-harmonized.R` in NAU-ASD3/nsch-ml-paper. All nine checks pass, including every cell outside the 2016 `a1_grade` draws.

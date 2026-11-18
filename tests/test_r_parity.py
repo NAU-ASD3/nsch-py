@@ -10,9 +10,12 @@ variables:
 
 Without both, every test here is skipped, which is how CI runs it.
 
-The 2016-2025 reference comes from NAU-ASD3/nsch 2026.11.9.2 (commit 0d4f6e2):
-431,222 rows by 167 columns. The 2016-2024 reference used for the wrap-up was
-generated on 2026-10-12 from commit fbdccb4: 386,083 rows by 168 columns.
+The 2016-2025 reference comes from NAU-ASD3/nsch 2026.11.18 or later, the version
+that keeps the higher ``higrade`` in the 2016 imputation: 431,222 rows by 167
+columns. An export from an earlier version fails the ``higrade`` and
+``higrade_tvis`` checks.
+The 2016-2024 reference used for the wrap-up was generated on 2026-10-12 from
+commit fbdccb4: 386,083 rows by 168 columns.
 
 Rows are matched on (year, hhid), so neither side's row order matters. Every
 cell must agree except where the 2016 ``a1_grade`` imputation draws at random:

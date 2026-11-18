@@ -39,9 +39,12 @@ def impute_a1_grade_2016(
     ``nsch/data/a1_grade_2016_weights.csv``, the same file as the R package's, so the
     2016 values do not depend on which other years ``combined_df`` contains.
 
-    After assigning fine ``a1_grade`` values, the function deterministically
-    updates ``higrade`` (3-level) and ``higrade_tvis`` (4-level) to be consistent,
-    using the same mappings that ``apply_do_labels`` derives from the ``.do`` files.
+    After assigning fine ``a1_grade`` values, the function sets ``higrade``
+    (3-level) and ``higrade_tvis`` (4-level) from them, using the same mappings
+    that ``apply_do_labels`` derives from the ``.do`` files. Both variables are the
+    highest education among the adults in the household. Where the 2016 file already
+    has a value, because a second adult's education was reported, the function keeps
+    the higher of that value and the one adult 1's imputed education implies.
 
     Parameters
     ----------
@@ -217,14 +220,25 @@ def impute_a1_grade_2016(
     indexed_df = indexed_df.join(updated_df, on="_row", how="left")
     is_target = pl.col("_row").is_in(rows_2016["_row"].implode())
 
+    def higher(col: str, fine_to_level: dict[str, str]) -> pl.Expr:
+        """The higher of ``col``'s current value and the level the drawn a1_grade implies.
+
+        higrade and higrade_tvis are the highest education among the adults in the
+        household. Where the 2016 file already has a value, because a second adult's
+        education was reported, that value is kept unless adult 1's imputed education
+        implies a higher one. ``fine_to_level`` lists its levels from low to high.
+        """
+        rank = {level: i for i, level in enumerate(dict.fromkeys(fine_to_level.values()))}
+        old = pl.col(col).cast(pl.String)
+        new = pl.col("_new").replace_strict(fine_to_level, default=None, return_dtype=pl.String)
+        old_rank = old.replace_strict(rank, default=None, return_dtype=pl.Int64)
+        new_rank = new.replace_strict(rank, default=None, return_dtype=pl.Int64)
+        return pl.when(old_rank > new_rank).then(old).otherwise(new)
+
     new_values = {
         "a1_grade": pl.col("_new"),
-        "higrade": pl.col("_new").replace_strict(
-            fine_to_higrade, default=None, return_dtype=pl.String
-        ),
-        "higrade_tvis": pl.col("_new").replace_strict(
-            fine_to_tvis, default=None, return_dtype=pl.String
-        ),
+        "higrade": higher("higrade", fine_to_higrade),
+        "higrade_tvis": higher("higrade_tvis", fine_to_tvis),
     }
 
     return indexed_df.with_columns(
