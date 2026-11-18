@@ -11,6 +11,7 @@ so each version stays unique and the date stays honest.
 ## 2026.11.18 (PR#NN)
 
 - `impute_a1_grade_2016` no longer lowers `higrade` or `higrade_tvis`. Both are the highest education among the adults in the household, and for 327 of the 1,524 households whose 2016 `a1_grade` is imputed the file already has a value, because a second adult's education was reported. The function replaced that value with the one adult 1's imputed education implies; it now keeps the higher of the two, matching NAU-ASD3/nsch. In the 2016 output 28 values of `higrade` and 53 of `higrade_tvis` change, all upward, and nothing else does.
+- Config: the logical-skip recodes of `k5q21` and of `k5q40`, `k5q41`, `k5q42`, `k5q43`, `k5q44`, `discussopt` and `bestforchild` now go to a code no answer uses (3 for `k5q21`, 5 for the others), as `k5q11`'s does. They went to 2 and 4, the codes for "No" and "Never", with the label "No healthcare provider visits last 12 months". The output doesn't change, because the label was applied only to the recoded rows, but anything that labels by code would have given "No" and "Never" the skip's label. The file still matches the R package's copy byte for byte
 - `tests/test_r_parity.py` names the R reference it now needs, the export from NAU-ASD3/nsch 2026.11.18
 
 ## 2026.11.17 (PR#117)
